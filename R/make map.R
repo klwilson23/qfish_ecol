@@ -13,6 +13,7 @@ library(bcmapsdata)
 library(viridis)
 library(ggnewscale)
 library(tidyr)
+library(cowplot)
 
 buffer <- 25000
 
@@ -118,8 +119,7 @@ ggplot(data=watersheds) +
   geom_sf(data=major_rivers,lwd=1,colour = "black") +
   geom_sf(data=data_point_labels$ocean_entry[data_point_labels$population=="bella_coola"],pch=22,cex=2,bg='seagreen')
 
-#alaska <- bcmaps::bc_neighbours() %>% st_intersection(plot_area_ncc)
-#alaska_full <- bcmaps::bc_neighbours()
+
 pfma <- st_read("Data/PFMA/DFO_PFMA_SUBAREAS_SP/DFO_SBAREA_polygon.shp")
 pfma <- pfma[pfma$MGMT_AREA>=2 & pfma$MGMT_AREA<=10,]
 catch_area <- pfma %>% st_intersection(plot_area_ncc) %>% st_difference(bchres)
@@ -129,11 +129,11 @@ bc_fish <- bchres %>% st_intersection(catch_area)
 alaska <- st_transform(USAboundaries::us_states(states = "Alaska", resolution = "high"),st_crs(plot_area_ncc))
 alaska_full <- alaska %>% st_intersection(bchres)
 alaska <- alaska  %>% st_intersection(plot_area_ncc)
-###########
+
+catch_area_union <- catch_area %>% group_by(MGMT_AREA) %>% summarize(geometry = st_union(geometry)) %>% st_sf() # collapse cc_sub to one polygon
 
 ## The fun part! we get to make a map
 ## Plot map -- Order of plotting MATTERS
-catch_area_union <- catch_area %>% group_by(MGMT_AREA) %>% summarize(geometry = st_union(geometry)) %>% st_sf() # collapse cc_sub to one polygon
 
 ncc_map <- ggplot() +
   geom_sf(data = catch_area_union, aes(fill=as.factor(MGMT_AREA))) +
@@ -168,8 +168,6 @@ bc_map <- ggplot() +
   theme_void() +
   theme(panel.background = element_rect(fill=adjustcolor("white",0.90), colour="black"))
 bc <- bc_map + geom_rect(aes(xmin=ncc_extent@xmin,ymin=ncc_extent@ymin,xmax=ncc_extent@xmax,ymax=ncc_extent@ymax),fill = "tomato", colour = "grey70",alpha=0.5)
-
-library(cowplot)
 
 ncc_inset <- ggdraw(ncc_map) +
   draw_plot({
