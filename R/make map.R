@@ -145,7 +145,7 @@ ncc_map <- ggplot() +
   geom_sf(data = all_streams, colour = "#1f78b4",lwd=0.15) +  #Plot Rivers
   geom_sf(data = rivers_ncc, colour = "#1f78b4") +
   geom_sf(data = lakes_in_plot_area, fill = "#1f78b4",colour=NA) +     #Plot Lakes
-  ggsflabel::geom_sf_label_repel(data=data_point_labels,aes(label=population,fill=region),size=1.5, force = 1, nudge_x = -2, seed = 10,max.overlaps=20)+ #Add labels
+  ggsflabel::geom_sf_label_repel(data=data_point_labels,aes(label=population,fill=region),size=1.5, force = 1, nudge_x = -2, seed = 10,max.overlaps=20,key_glyph = draw_key_rect)+ #Add labels
   geom_sf(data=data_point_labels,pch=21,aes(fill=region)) +
   guides(fill = guide_legend(override.aes = list(size = 3))) +
   scale_fill_brewer(name="Region",palette = "Paired",direction=1) +
@@ -157,7 +157,7 @@ ncc_map <- ggplot() +
                          pad_x = unit(0.5, "in"), pad_y = unit(0.25, "in"),
                          style = north_arrow_fancy_orienteering,
                          height = unit(1,"cm"), width = unit(1, "cm"))+
-  theme(panel.background = element_rect('lightblue1'), panel.grid.major = element_line('lightblue1'),legend.position="top",legend.box.just="center",legend.box="horizontal",legend.justification = "center",legend.key.size=unit(1, "lines"),legend.key = element_rect(fill=NA),legend.margin = margin(c(0,0,0,-1),unit="lines"),legend.title=element_text(size=6),legend.text = element_text(size=5))
+  theme(panel.background = element_rect('lightblue1'), panel.grid.major = element_line('lightblue1'),legend.position="top",legend.box.just="center",legend.box="horizontal",legend.justification = "center",legend.key.size=unit(1, "lines"),legend.margin = margin(c(0,0,0,-1),unit="lines"),legend.title=element_text(size=6),legend.text = element_text(size=5))
 
 bc_neigh <- bc_neighbours(ask=FALSE)
 bc_neigh <- bc_neigh[bc_neigh$name%in%c("Alaska"),]
