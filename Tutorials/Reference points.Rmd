@@ -16,7 +16,13 @@ output:
     fig_width: 7
     fig_height: 6
     smart: true
-    df_print: tibble 
+    df_print: tibble
+bibliography: Fisheries_references.bib
+csl: conservation-letters.csl
+filters:
+  - type: bib
+    path: "Markdown/Metapop_references.bib"
+  - type: pandoc-citeproc
 ---
 
 ```{r setup, include=FALSE}
@@ -74,6 +80,94 @@ legend("bottomright",c("Population 1","Population 2","Replacement"),bty="n",lwd=
 
 ```
 
+## Sustainable Fisheries Framework: reference points
+Based on these demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield.
+
+### Beverton-Holt or Ricker - same, same
+Let's make a function that let's us tap into the same input parameters, but ask what the expected recruits would be under assumptions of a *Beverton-Holt* compared to a *Ricker* model.
+
+```{r recruitment function}
+alpha <- 5
+beta <- 200
+population_model <- function(alpha,beta,Nadults,model="Beverton-Holt")
+{
+  if(model=="Beverton-Holt")
+  {
+    # population model is R ~ (CR * S)/(1+(CR-1)/K * S): reparameterized Beverton-Holt
+    recruits <- (alpha*Nadults)/(1+((alpha-1)/beta)*Nadults)
+  }
+  if(model=="Ricker")
+  {
+    # population model is R ~ CR * S * e(-log(CR)/K * S): reparameterized Ricker
+    recruits <- alpha*Nadults*exp(-log(alpha)/beta*Nadults)
+  }
+  return(list("recruits"=recruits))
+}
+
+curve(population_model(alpha=alpha,beta=beta,Nadults=x,model="Beverton-Holt")$recruits,from=0,to=2*beta,lwd=2,col="orange",xlab="Adults (t-1)",ylab="Recruits (t)",ylim=c(0,2*beta))
+curve(population_model(alpha=alpha,beta=beta,Nadults=x,model="Ricker")$recruits,from=0,to=2*beta,lwd=2,col="dodgerblue",add=TRUE)
+abline(b=1,a=0,lty=3,lwd=1.5,col="grey50")
+points(c(beta,beta),c(beta,beta),pch=21,bg="grey50",col="black")
+legend("bottomright",c("Beverton-Holt","Ricker","Replacement"),bty="n",lwd=1.5,lty=c(1,1,3),pch=c(NA,NA,21),col=c("orange","dodgerblue","grey50"),pt.bg="grey50",cex=0.8)
+
+```
+
+### MSY
+Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population. It is a very helpful thing to know about the population!
+
+```{r MSY}
+umsy_find <- function(u_x,alpha, beta,model="Beverton-Holt")
+{
+  if(model=="Beverton-Holt")
+  {
+    # population model is R ~ (CR * S)/(1+(CR-1)/K * S): reparameterized Beverton-Holt
+    adults <- (1-u_x)*beta
+    recruits <- population_model(alpha=alpha,beta=beta,Nadults=adults,model="Beverton-Holt")$recruits
+    yield <- u_x*recruits
+  }
+  if(model=="Ricker")
+  {
+    # population model is R ~ CR * S * e(-log(CR)/K * S): reparameterized Ricker
+    adults <- (1-u_x)*beta
+    recruits <- population_model(alpha=alpha,beta=beta,Nadults=adults,model="Ricker")$recruits
+    yield <- u_x*recruits
+  }
+  return(yield)
+}
+
+curve(umsy_find(u_x=x,alpha=alpha,beta=beta),from=0,to=1,xlab="Exploitation rate",ylab="Yield")
+umsy <- optimize(umsy_find,c(0,1),tol=0.0001,alpha=alpha,beta=beta,maximum = TRUE)$maximum
+S_msy <- (1-umsy)*beta
+MSY <- umsy*population_model(alpha=alpha,beta=beta,Nadults=S_msy,model="Beverton-Holt")$recruits
+
+data.frame("U"=umsy,"Smsy"=S_msy,"MSY"=MSY)
+```
+### Limit reference point: S(gen)
+Then, we will estimate one version of a limit reference point called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation. It is a conservation-based benchmark and lets us know how low we can go before we need to close fisheries and still get back to MSY fairly quick.
+
+```{r Sgen}
+Sgen_find <- function(Smsy,Sgen,alpha,beta)
+{
+  (Smsy-population_model(alpha=alpha,beta=beta,Nadults=Sgen,model="Beverton-Holt")$recruits)^2
+}
+
+Sgen <- optimize(Sgen_find,c(0,S_msy),tol=0.0001,Smsy=S_msy,alpha=alpha,beta=beta)$minimum
+Sgen
+```
+
+### Reference points: visualized
+Now, we have our reference points for a 1-year generation time population. Let's plot this out:
+```{r WSP plot}
+plot(0:(2*beta),population_model(alpha=alpha,beta=beta,0:(2*beta))$recruits,xlab="Spawners",ylab="Recruits",type="l",lwd=2)
+abline(v=S_msy,lty=2,lwd=2,col="orange3")
+abline(v=Sgen,lty=2,lwd=2,col="red3")
+abline(a=0,b=1,lty=2,lwd=2,col="grey50")
+points(beta,beta,pch=21,bg="grey50",col="black")
+legend("bottomright",c("USR","LRP"),bty="n",lwd=1.5,lty=c(1,1),pch=c(NA,NA),col=c("orange3","red3"),cex=0.8)
+
+```
+
+## Case study - example from simulation
 ### Recruitment stochasticity
 We can model stochastic recruitment and, in this case, we will use a lognormal distribution with average variation in recruitment of $\sigma_R$. In cases with stochastic recruitment, the deterministic recruitment in eq. S.4 becomes:
 
@@ -99,8 +193,6 @@ Nyears <- 50
 seed <- 2025
 rho <- 0.8
 sigma_r <- 0.5
-alpha <- 5
-beta <- 200
 set.seed(seed)
 epsilon <- rnorm(Nyears,mean=0,sd=sigma_r)
 N <- recruits <- rep(NA,Nyears)
@@ -118,6 +210,8 @@ curve((alpha*x)/(1+((alpha-1)/beta)*x),from=0,lwd=2,col="dodgerblue",add=TRUE)
 head(data.frame("Adults"=N,"Recruits"=recruits))
 
 print(c("sd in simulated recruitment (independent)",round(sd(epsilon),2)))
+
+df1 <- data.frame("Year"=1:Nyears,"Adults"=N,"Recruits"=recruits,"variance"="independent")
 
 set.seed(seed)
 epsilon <- rnorm(1,mean=0,sd=sigma_r)
@@ -139,4 +233,38 @@ head(data.frame("Adults"=N,"Recruits"=recruits))
 
 print(c("sd in simulated recruitment (correlated)",round(sd(epsilon),2)))
 
+df2 <- data.frame("Year"=1:Nyears,"Adults"=N,"Recruits"=recruits,"variance"="correlated")
+
+df <- rbind(df1,df2)
 ```
+
+## Estimating recruitment model
+Let's estimate the Beverton-Holt
+```{r optim, echo=FALSE, warning=FALSE, message = FALSE}
+
+df_sub <- df[df$variance=="independent",]
+mle_fit <- function(par,dataset)
+{
+  # theta <- start
+  alpha <- exp(par[1])
+  beta <- par[2]
+  sigma <- exp(par[3])
+  # data <- df_sub
+  mu <- (alpha*dataset$Adults)/(1+((alpha-1)/beta)*dataset$Adults)
+  log_lik <- dlnorm(x=dataset$Recruits,meanlog=log(mu)+((sigma^2)/2),sdlog=sigma,log=TRUE)
+  nll <- -sum(log_lik)
+  return(nll)
+}
+start <- c(log(2),mean(df_sub$Recruits),0)
+fit <- optim(par=start,fn=mle_fit,dataset=df_sub,method="BFGS",hessian=TRUE)
+par <- fit$par
+alpha_est <- exp(par[1])
+beta_est <- par[2]
+sigma_est <- exp(par[3])
+
+parameters <- data.frame("alpha"=c(alpha,alpha_est),"beta"=c(beta,beta_est),"sigma"=c(sigma_r,sigma_est),"type"=c("true","estimate"))
+parameters
+```
+
+## References
+<div id="refs"></div>
