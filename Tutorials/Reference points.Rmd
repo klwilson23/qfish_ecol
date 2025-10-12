@@ -44,8 +44,7 @@ Our population is defined by as a species with a one year generation time with t
 N_{t}=(1-d_{t})R_{t}
 \end{align}
 
-where $N_{i,t}$ is the number of adults at time *t*, $R_{i,t}$ is the number of recruits at time *t*, and $d_{t}$ is the fraction of recruits lost due to some source of mortliaty (i.e., harvest or disturbance).
-
+where $N_{t}$ is the number of adults at time *t*, $R_{t}$ is the number of recruits at time *t*, and $d_{t}$ is the fraction of recruits lost due to some source of mortliaty (i.e., harvest or disturbance). It then follows that $1-d_{t}$ is discrete survival.
 
 ### Beverton-Holt recruitment
 Let's assume that our recruitment dynamics at time *t* depend on adult densities at *t-1*  following a reparameterized Beverton-Holt function based on compensation ratio [see Box 3.1 in @Walters2004] and ignoring age-structure so that we model adult-to-adult dynamics, i.e., setting $\phi_{E_{0}}=1$, $\phi_{B_{0}}=1$ and $R_0=N_0$ [see Table 3 in @Forrest2010]:
@@ -56,12 +55,17 @@ R_{t}=\cfrac{{\alpha}N_{t-1}}{1+\cfrac{\alpha}{\beta}N_{t-1}}\epsilon_{t}
 
 where $\alpha$ is the recruitment compensation ratio, $\beta$ is carrying capacity, and $\epsilon_{i,t}$ is lognormally distributed deviates to introduce stochastic recruitment dynamics.
 
+So effectively the number of adults at time *t* is a function of the abundance of adults at a previous time-step *t-1* that survived some potential harvest regime. Let's assume $d=0$ to begin:
+\begin{align}
+N_{t}=(1-d)*\cfrac{{\alpha}N_{t-1}}{1+\cfrac{\alpha}{\beta}N_{t-1}}\epsilon_{t}
+\end{align}
+
 ```{r recruitment,echo=FALSE}
 alpha <- c(2,4)
 beta <- c(100,200)
 ```
 
-For example, take a two different populations (Figure S1) that each vary in productivty $\alpha_1=2; \alpha_2=4$ and carrying capacity $\beta_1=100; \beta_2=200$. 
+For example, take a two different populations that each vary in productivty $\alpha_1=2; \alpha_2=4$ and carrying capacity $\beta_1=100; \beta_2=200$. 
 
 <br>
 ```{r recruit curves, echo=FALSE,warning = F, message = F,fig.hold=TRUE,fig.width=5.5, fig.height = 5,fig.cap="Density dependence in recruitment dynamics. Dashed line indicates the line of replacement, with equilbrium indicated by points. When populations fall below equilibrium points, per-capita productivity improves driving populations back towards equilibrium. When populations exceed their capacity, per-capita productivity decreases driving populations back towards equilibrium. At each point of the x-axis, the difference between the solid and dashed lines indicates the amount of recruitment above replacement, i.e., the surplus recruitment produced via compensatory density dependence.",fig.align="center"}
@@ -81,10 +85,10 @@ legend("bottomright",c("Population 1","Population 2","Replacement"),bty="n",lwd=
 ```
 
 ## Sustainable Fisheries Framework: reference points
-Based on these demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield.
+Based on these $\alpha$ and $\beta$ demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield.
 
-### Beverton-Holt or Ricker - same, same
-Let's make a function that let's us tap into the same input parameters, but ask what the expected recruits would be under assumptions of a *Beverton-Holt* compared to a *Ricker* model.
+### Beverton-Holt and Ricker: two sides of the same coin
+Let's make a function that let's us tap into the same input parameters, but ask what the expected recruits would be under assumptions of a *Beverton-Holt* compared to a *Ricker* model. We will start with *Beverton-Holt*, but its easy to change this later. The point is that the numerical methods we learn below work the same between any population dynamics models that we choose, just requires different equations on the *r.h.s* of things. We will work with a population that has $\alpha=5$ and spawners at carrying capacity $\beta=200$
 
 ```{r recruitment function}
 alpha <- 5
@@ -113,7 +117,7 @@ legend("bottomright",c("Beverton-Holt","Ricker","Replacement"),bty="n",lwd=1.5,l
 ```
 
 ### MSY
-Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population. It is a very helpful thing to know about the population!
+Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population. It is a very helpful thing to know about the population, and it has a clear numerical solution as it occurs at the *maximum* of a yield curve.
 
 ```{r MSY}
 umsy_find <- function(u_x,alpha, beta,model="Beverton-Holt")
@@ -143,7 +147,7 @@ MSY <- umsy*population_model(alpha=alpha,beta=beta,Nadults=S_msy,model="Beverton
 data.frame("U"=umsy,"Smsy"=S_msy,"MSY"=MSY)
 ```
 ### Limit reference point: S(gen)
-Then, we will estimate one version of a limit reference point called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation. It is a conservation-based benchmark and lets us know how low we can go before we need to close fisheries and still get back to MSY fairly quick.
+Then, we will estimate one version of a limit reference point called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation. It is a conservation-based benchmark and lets us know how low we can go before we need to close fisheries while still maintaining the ability to get back to MSY fairly quick.
 
 ```{r Sgen}
 Sgen_find <- function(Smsy,Sgen,alpha,beta)
@@ -167,9 +171,17 @@ legend("bottomright",c("USR","LRP"),bty="n",lwd=1.5,lty=c(1,1),pch=c(NA,NA),col=
 
 ```
 
+So here we have our *SFF* and *Wild Salmon Policy* reference points for a population that reproduces according to Beverton-Holt dynamics. We used numerical methods (e.g., a univariate optimizer) to find these reference points. Sometimes, this is overkill as there is actually an analytical solution for some population dynamics models. For the Beverton-Holt, for instance, there is! Which just means you can use math to solve for MSY. Specifically, you can solve for the 2nd derivative of the population dynamics model, and then set the 2nd derivative equal to 0 to find where the production function is maximized (or where the rate of change in production is equal to 0).
+
+In this parameterization of the Beverton-Holt model (and there are several parameterizations that exist),
+
+$S_{MSY}=(\sqrt\alpha-1)/(\alpha-1)/\beta)$, which for our case is: `r (sqrt(5)-1)/((alpha-1)/beta)`
+
+But this doesn't work for all models. And, in our case, numerical solution for $S_{MSY}$ (`r S_msy`) gives a pretty close approximation to the analytical solution (`r (sqrt(5)-1)/((alpha-1)/beta)`) and works in many, many situations.
+
 ## Case study - example from simulation
 ### Recruitment stochasticity
-We can model stochastic recruitment and, in this case, we will use a lognormal distribution with average variation in recruitment of $\sigma_R$. In cases with stochastic recruitment, the deterministic recruitment in eq. S.4 becomes:
+We can model stochastic recruitment and, in this case, we will use a lognormal distribution with average variation in recruitment of $\sigma_R$. In cases with stochastic recruitment, the deterministic recruitment becomes:
 
 \begin{align}
 R_{t}=\cfrac{{\alpha}N_{t-1}}{1+\cfrac{{\alpha}}{\beta}N_{t-1}}e^{\epsilon_{t}-\cfrac{\sigma_{R}^2}{2}}
@@ -239,8 +251,11 @@ df <- rbind(df1,df2)
 ```
 
 ## Estimating recruitment model
-Let's estimate the Beverton-Holt
-```{r optim, echo=FALSE, warning=FALSE, message = FALSE}
+Let's estimate the Beverton-Holt model by fitting it to our simulated stock-recruit dataset. We can assume the *independent* correlation structure for now, but really we would just revise the equation for $\mu$ below. Here, we are using the R function called $optim$ in order to find the *most likely* fit of a Beverton-Holt model to this dataset, presuming a *lognormal* error structure. $optim$ is just another numerical tool to find the *minimum* or *maximum* solution to a problem. 
+
+First, we will creating a function called *mle_fit* and get R to solve this for us on our behalf. We then read in potential starting parameters for $\alpha$ and $\beta$, and this will let $optim$ to get going. Understanding how functions work in R is the main trick here, and may take some time.
+
+```{r optim}
 
 df_sub <- df[df$variance=="independent",]
 mle_fit <- function(par,dataset)
@@ -265,6 +280,38 @@ sigma_est <- exp(par[3])
 parameters <- data.frame("alpha"=c(alpha,alpha_est),"beta"=c(beta,beta_est),"sigma"=c(sigma_r,sigma_est),"type"=c("true","estimate"))
 parameters
 ```
+
+### Estimating MSY from model fit
+Once we have the *MLE* solutions for $\alpha$ and $\beta$ for our presumed Beverton-Holt model, we have all the ingredients we need to then estimate our fishery reference points.
+```{r estimating MSY and Sgen}
+curve(umsy_find(u_x=x,alpha=alpha_est,beta=beta_est),from=0,to=1,xlab="Exploitation rate",ylab="Yield")
+umsy_est <- optimize(umsy_find,c(0,1),tol=0.0001,alpha=alpha_est,beta=beta_est,maximum = TRUE)$maximum
+S_msy_est <- (1-umsy_est)*beta_est
+MSY_est <- umsy_est*population_model(alpha=alpha_est,beta=beta_est,Nadults=S_msy_est,model="Beverton-Holt")$recruits
+
+Sgen_est <- optimize(Sgen_find,c(0,S_msy_est),tol=0.0001,Smsy=S_msy_est,alpha=alpha_est,beta=beta_est)$minimum
+
+data.frame("Type"=c("Actual","Estimated"),"U"=c(umsy,umsy_est),"Smsy"=c(S_msy,S_msy_est),"MSY"=c(MSY,MSY_est),"Sgen"=c(Sgen,Sgen_est))
+```
+
+### Visualizing real versus estimated reference points
+Now, we have our real and our *MLE* estimated reference points. Let's compare and see how we did.
+```{r WSP plot estimtes}
+plot(0:(2*beta),population_model(alpha=alpha,beta=beta,0:(2*beta))$recruits,xlab="Spawners",ylab="Recruits",type="l",lwd=2)
+lines(0:(2*beta),population_model(alpha=alpha_est,beta=beta_est,Nadults=0:(2*beta),model="Beverton-Holt")$recruits,type="l",lwd=2,col="dodgerblue")
+abline(v=S_msy,lty=1,lwd=2,col="orange3")
+abline(v=S_msy_est,lty=2,lwd=2,col="orange3")
+
+abline(v=Sgen,lty=1,lwd=2,col="red3")
+abline(v=Sgen_est,lty=2,lwd=2,col="red3")
+
+abline(b=1,a=0,lty=5,col="black")
+legend("bottomright",c("Actual","Estimated"),bty="n",lwd=1.5,lty=c(1,2),pch=c(NA,NA),col=c("black","dodgerblue"),cex=0.8)
+
+```
+
+
+Not bad! Now, we have our reference points. And, we can assess this population in the future and determine status like: is it undergoing overfishing $U_{t}>U_{MSY}$ or it overfished $S_t<S_{MSY}$. Or even, is it at a conservation concern $S_t<S_{GEN}$. Such is the power of the quantitative approach.
 
 ## References
 <div id="refs"></div>
