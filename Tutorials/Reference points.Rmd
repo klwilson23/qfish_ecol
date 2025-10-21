@@ -17,26 +17,26 @@ output:
     fig_height: 6
     smart: true
     df_print: tibble
-bibliography: Fisheries_references.bib
+bibliography: current_library.bib
 csl: conservation-letters.csl
 filters:
   - type: bib
-    path: "Markdown/Metapop_references.bib"
+    path: "current_library.bib"
   - type: pandoc-citeproc
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-```{r source,echo=FALSE,warning = FALSE, message = FALSE}
+```{r source,echo=TRUE,warning = FALSE, message = FALSE}
 library(mvtnorm)
 library(marima)
 library(diagram)
 library(vioplot)
 library(ggplot2)
 ```
-## Population model
-### Population dynamics
+# Part 1: Population model
+## Population dynamics
 
 Our population is defined by as a species with a one year generation time with time-dynamics that follows birth (i.e., recruitment *R*) and death processes (i.e., fishing mortality *d*) such that:
 
@@ -44,31 +44,31 @@ Our population is defined by as a species with a one year generation time with t
 N_{t}=(1-d_{t})R_{t}
 \end{align}
 
-where $N_{t}$ is the number of adults at time *t*, $R_{t}$ is the number of recruits at time *t*, and $d_{t}$ is the fraction of recruits lost due to some source of mortliaty (i.e., harvest or disturbance). It then follows that $1-d_{t}$ is discrete survival.
+where $N_{t}$ is the number of adults at time *t*, $R_{t}$ is the number of recruits at time *t*, and $d_{t}$ is the fraction of recruits lost due to some source of mortality (i.e., the cumulative product of marine survival, harvest, or other disturbance). It then follows that $1-d_{t}$ is discrete survival. In many instances for fisheries dynamics, we might model this using continuous rates of mortality $M_t$ and $F_t$ such that: $d_t=1-e^{-M_t+F_t}$ - but lets ignore this for now.
 
-### Beverton-Holt recruitment
+## Beverton-Holt recruitment
 Let's assume that our recruitment dynamics at time *t* depend on adult densities at *t-1*  following a reparameterized Beverton-Holt function based on compensation ratio [see Box 3.1 in @Walters2004] and ignoring age-structure so that we model adult-to-adult dynamics, i.e., setting $\phi_{E_{0}}=1$, $\phi_{B_{0}}=1$ and $R_0=N_0$ [see Table 3 in @Forrest2010]:
 
 \begin{align}
 R_{t}=\cfrac{{\alpha}N_{t-1}}{1+\cfrac{\alpha}{\beta}N_{t-1}}\epsilon_{t}
 \end{align}
 
-where $\alpha$ is the recruitment compensation ratio, $\beta$ is carrying capacity, and $\epsilon_{i,t}$ is lognormally distributed deviates to introduce stochastic recruitment dynamics.
+where $\alpha$ is the recruitment compensation ratio, $\beta$ is carrying capacity, and $\epsilon_{i,t}$ is lognormally distributed deviates to introduce stochastic recruitment dynamics (@methot_adjusting_2011).
 
-So effectively the number of adults at time *t* is a function of the abundance of adults at a previous time-step *t-1* that survived some potential harvest regime. Let's assume $d=0$ to begin:
+So effectively the number of adults at time *t* is a function of the abundance of adults at a previous time-step *t-1* that survived some potential harvest regime. Let's assume $d_t=0$ to begin:
 \begin{align}
-N_{t}=(1-d)*\cfrac{{\alpha}N_{t-1}}{1+\cfrac{\alpha}{\beta}N_{t-1}}\epsilon_{t}
+N_{t}=(1-d_{t})*\cfrac{{\alpha}N_{t-1}}{1+\cfrac{\alpha}{\beta}N_{t-1}}\epsilon_{t}
 \end{align}
 
-```{r recruitment,echo=FALSE}
+```{r recruitment,echo=TRUE}
 alpha <- c(2,4)
 beta <- c(100,200)
 ```
 
-For example, take a two different populations that each vary in productivty $\alpha_1=2; \alpha_2=4$ and carrying capacity $\beta_1=100; \beta_2=200$. 
+For example, take a two different populations that each vary in productivity $\alpha_1=2; \alpha_2=4$ and carrying capacity $\beta_1=100; \beta_2=200$. 
 
 <br>
-```{r recruit curves, echo=FALSE,warning = F, message = F,fig.hold=TRUE,fig.width=5.5, fig.height = 5,fig.cap="Density dependence in recruitment dynamics. Dashed line indicates the line of replacement, with equilbrium indicated by points. When populations fall below equilibrium points, per-capita productivity improves driving populations back towards equilibrium. When populations exceed their capacity, per-capita productivity decreases driving populations back towards equilibrium. At each point of the x-axis, the difference between the solid and dashed lines indicates the amount of recruitment above replacement, i.e., the surplus recruitment produced via compensatory density dependence.",fig.align="center"}
+```{r recruit curves, echo=TRUE,warning = F, message = F,fig.hold=TRUE,fig.width=5.5, fig.height = 5,fig.cap="Density dependence in recruitment dynamics. Dashed line indicates the line of replacement, with equilbrium indicated by points. When populations fall below equilibrium points, per-capita productivity improves driving populations back towards equilibrium. When populations exceed their capacity, per-capita productivity decreases driving populations back towards equilibrium. At each point of the x-axis, the difference between the solid and dashed lines indicates the amount of recruitment above replacement, i.e., the surplus recruitment produced via compensatory density dependence.",fig.align="center"}
 curve((alpha[1]*x)/(1+((alpha[1]-1)/beta[1])*x),from=0,to=2*beta[2],lwd=2,col="orange",xlab="Adults (t-1)",ylab="Recruits (t)",ylim=1.5*c(0,beta[2]),xlim=2*c(0,beta[2]))
 curve((alpha[2]*x)/(1+((alpha[2]-1)/beta[2])*x),from=0,to=2*beta[2],lwd=2,col="dodgerblue",add=TRUE)
 abline(b=1,a=0,lty=3,lwd=1.5,col="grey50")
@@ -85,10 +85,10 @@ legend("bottomright",c("Population 1","Population 2","Replacement"),bty="n",lwd=
 ```
 
 ## Sustainable Fisheries Framework: reference points
-Based on these $\alpha$ and $\beta$ demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield.
+Based on these $\alpha$ and $\beta$ demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield. Others might be based on fractions of *carrying capacity*: but this depends on whether we are interested in the *recruits at carrying capacity* $R_0$ or *spawners at carrying capacity* ($N_0$). In this version of the recruitment model, $\beta=R_{0}=N_{0}$ because, when adult mortality is $d_t=0$, then we are only modelling how current spawning adults create future spawning adults. Sometimes, we are modelling how current spawning adult abundances (or spawner biomass) create future juveniles (either in abundance or biomass) and $R_{0} \neq N_{0}$.
 
 ### Beverton-Holt and Ricker: two sides of the same coin
-Let's make a function that let's us tap into the same input parameters, but ask what the expected recruits would be under assumptions of a *Beverton-Holt* compared to a *Ricker* model. We will start with *Beverton-Holt*, but its easy to change this later. The point is that the numerical methods we learn below work the same between any population dynamics models that we choose, just requires different equations on the *r.h.s* of things. We will work with a population that has $\alpha=5$ and spawners at carrying capacity $\beta=200$
+Let's make a function that let's us tap into the same input parameters, but ask what the expected recruits would be under assumptions of a *Beverton-Holt* compared to a *Ricker* model. We will start with *Beverton-Holt*, but its easy to change this later. The point is that the numerical methods we learn below work the same between any population dynamics models that we choose, just requires different equations on the *r.h.s* of things. We will work with a population that has $\alpha=5$ and *spawners at carrying capacity* $\beta=200$
 
 ```{r recruitment function}
 alpha <- 5
@@ -179,8 +179,8 @@ $S_{MSY}=(\sqrt\alpha-1)/(\alpha-1)/\beta)$, which for our case is: `r (sqrt(5)-
 
 But this doesn't work for all models. And, in our case, numerical solution for $S_{MSY}$ (`r S_msy`) gives a pretty close approximation to the analytical solution (`r (sqrt(5)-1)/((alpha-1)/beta)`) and works in many, many situations.
 
-## Case study - example from simulation
-### Recruitment stochasticity
+# Part II: case study with simulation
+## Recruitment stochasticity
 We can model stochastic recruitment and, in this case, we will use a lognormal distribution with average variation in recruitment of $\sigma_R$. In cases with stochastic recruitment, the deterministic recruitment becomes:
 
 \begin{align}
@@ -200,12 +200,12 @@ where $\rho$ is temporal correlation (bounded $0-1$). If $\rho$ is 0, then annua
 \end{align}
 We illustrate the effects of two kinds of recruitment deviates below using the same random number generator seed:
 
-```{r recruitment stochasticity, echo=FALSE, warning=FALSE, message = FALSE,fig.width=10,fig.height=5}
-Nyears <- 50
+```{r recruitment stochasticity, echo=TRUE, warning=FALSE, message = FALSE,fig.width=10,fig.height=5}
+Nyears <- 40
 seed <- 2025
 rho <- 0.8
 sigma_r <- 0.5
-set.seed(seed)
+set.seed(seed) # sets the random numbers to the same values for everyone
 epsilon <- rnorm(Nyears,mean=0,sd=sigma_r)
 N <- recruits <- rep(NA,Nyears)
 N[1] <- beta
@@ -225,7 +225,7 @@ print(c("sd in simulated recruitment (independent)",round(sd(epsilon),2)))
 
 df1 <- data.frame("Year"=1:Nyears,"Adults"=N,"Recruits"=recruits,"variance"="independent")
 
-set.seed(seed)
+set.seed(seed) # resets the random numbers
 epsilon <- rnorm(1,mean=0,sd=sigma_r)
 N <- recruits <- rep(NA,Nyears)
 N[1] <- beta
@@ -255,6 +255,8 @@ Let's estimate the Beverton-Holt model by fitting it to our simulated stock-recr
 
 First, we will creating a function called *mle_fit* and get R to solve this for us on our behalf. We then read in potential starting parameters for $\alpha$ and $\beta$, and this will let $optim$ to get going. Understanding how functions work in R is the main trick here, and may take some time.
 
+For our purposes, we will apply the bias-correction term $\sigma^2/2$ by subtracting that from the log of the mean expected recruitment $log_e(\mu)$. This is a common approach to adjust estimated recruitment curves in the face of noisy stock-recruitment data (assuming lognormally distributed error) used in fisheries assessments (@methot_adjusting_2011).
+
 ```{r optim}
 
 df_sub <- df[df$variance=="independent",]
@@ -266,7 +268,7 @@ mle_fit <- function(par,dataset)
   sigma <- exp(par[3])
   # data <- df_sub
   mu <- (alpha*dataset$Adults)/(1+((alpha-1)/beta)*dataset$Adults)
-  log_lik <- dlnorm(x=dataset$Recruits,meanlog=log(mu)+((sigma^2)/2),sdlog=sigma,log=TRUE)
+  log_lik <- dlnorm(x=dataset$Recruits,meanlog=log(mu)-((sigma^2)/2),sdlog=sigma,log=TRUE)
   nll <- -sum(log_lik)
   return(nll)
 }
