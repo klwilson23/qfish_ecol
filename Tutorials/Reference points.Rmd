@@ -68,7 +68,7 @@ beta <- c(100,200)
 For example, take a two different populations that each vary in productivity $\alpha_1=2; \alpha_2=4$ and carrying capacity $\beta_1=100; \beta_2=200$. 
 
 <br>
-```{r recruit curves, echo=TRUE,warning = F, message = F,fig.hold=TRUE,fig.width=5.5, fig.height = 5,fig.cap="Density dependence in recruitment dynamics. Dashed line indicates the line of replacement, with equilbrium indicated by points. When populations fall below equilibrium points, per-capita productivity improves driving populations back towards equilibrium. When populations exceed their capacity, per-capita productivity decreases driving populations back towards equilibrium. At each point of the x-axis, the difference between the solid and dashed lines indicates the amount of recruitment above replacement, i.e., the surplus recruitment produced via compensatory density dependence.",fig.align="center"}
+```{r recruit curves, echo=TRUE,warning = F, message = F,fig.cap="Density dependence in recruitment dynamics. Dashed line indicates the line of replacement, with equilbrium indicated by points. When populations fall below equilibrium points, per-capita productivity improves driving populations back towards equilibrium. When populations exceed their capacity, per-capita productivity decreases driving populations back towards equilibrium. At each point of the x-axis, the difference between the solid and dashed lines indicates the amount of recruitment above replacement, i.e., the surplus recruitment produced via compensatory density dependence."}
 curve((alpha[1]*x)/(1+((alpha[1]-1)/beta[1])*x),from=0,to=2*beta[2],lwd=2,col="orange",xlab="Adults (t-1)",ylab="Recruits (t)",ylim=1.5*c(0,beta[2]),xlim=2*c(0,beta[2]))
 curve((alpha[2]*x)/(1+((alpha[2]-1)/beta[2])*x),from=0,to=2*beta[2],lwd=2,col="dodgerblue",add=TRUE)
 abline(b=1,a=0,lty=3,lwd=1.5,col="grey50")
@@ -85,12 +85,14 @@ legend("bottomright",c("Population 1","Population 2","Replacement"),bty="n",lwd=
 ```
 
 ## Sustainable Fisheries Framework: reference points
+The SFF and updates to the Fisheries Act ask that reference points be established for Canada's major fisheries. Reference points delinates zones of risk: from 'healthy' to 'cautious' and from 'cautious' to 'concern' (red). These two reference points are referred to as the **Upper Stock Reference Point** and the **Limit Reference Point**
+
 Based on these $\alpha$ and $\beta$ demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield. Others might be based on fractions of *carrying capacity*: but this depends on whether we are interested in the *recruits at carrying capacity* $R_0$ or *spawners at carrying capacity* ($N_0$). In this version of the recruitment model, $\beta=R_{0}=N_{0}$ because, when adult mortality is $d_t=0$, then we are only modelling how current spawning adults create future spawning adults. Sometimes, we are modelling how current spawning adult abundances (or spawner biomass) create future juveniles (either in abundance or biomass) and $R_{0} \neq N_{0}$.
 
 ### Beverton-Holt and Ricker: two sides of the same coin
 Let's make a function that let's us tap into the same input parameters, but ask what the expected recruits would be under assumptions of a *Beverton-Holt* compared to a *Ricker* model. We will start with *Beverton-Holt*, but its easy to change this later. The point is that the numerical methods we learn below work the same between any population dynamics models that we choose, just requires different equations on the *r.h.s* of things. We will work with a population that has $\alpha=5$ and *spawners at carrying capacity* $\beta=200$
 
-```{r recruitment function}
+```{r recruitment function, fig.cap="Comparison between Beverton-Holt and Ricker recruitment model."}
 alpha <- 5
 beta <- 200
 population_model <- function(alpha,beta,Nadults,model="Beverton-Holt")
@@ -117,9 +119,9 @@ legend("bottomright",c("Beverton-Holt","Ricker","Replacement"),bty="n",lwd=1.5,l
 ```
 
 ### MSY
-Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population. It is a very helpful thing to know about the population, and it has a clear numerical solution as it occurs at the *maximum* of a yield curve.
+Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population. It is a very helpful thing to know about the population, and it has a clear numerical solution as it occurs at the *maximum* of a yield curve. The *SFF* and Wild Salmon Policy (*WSP*) delineate healthy from not healthy fish populations using the *USR* - de facto DFO policies sets the *USR* to be $0.8S_{MSY}$ for reasons that aren't well established. The United States NOAA National Marine Fisheries Service, for instance, uses $S_{MSY}$. Where the missing 20% went, who knows but see @Frid2023 for our thoughts.
 
-```{r MSY}
+```{r MSY, fig.cap="Yield curve indicating the amount of total catch (numbers or biomass) that can be expected given a certain amount of exploitation. The peak of this curve indicates the maximum sustainable yield that can be extracted from this population in perpetuity, given no changes in their demographics, etc."}
 umsy_find <- function(u_x,alpha, beta,model="Beverton-Holt")
 {
   if(model=="Beverton-Holt")
@@ -147,7 +149,7 @@ MSY <- umsy*population_model(alpha=alpha,beta=beta,Nadults=S_msy,model="Beverton
 data.frame("U"=umsy,"Smsy"=S_msy,"MSY"=MSY)
 ```
 ### Limit reference point: S(gen)
-Then, we will estimate one version of a limit reference point called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation. It is a conservation-based benchmark and lets us know how low we can go before we need to close fisheries while still maintaining the ability to get back to MSY fairly quick.
+Then, we will estimate one version of a *Limit Reference Point* called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation based on its current productivity. It is a conservation-based benchmark and lets us know how depleted the population can get before we need to curtail harvest while still maintaining the ability to get back to MSY fairly quick.
 
 ```{r Sgen}
 Sgen_find <- function(Smsy,Sgen,alpha,beta)
@@ -160,10 +162,10 @@ Sgen
 ```
 
 ### Reference points: visualized
-Now, we have our reference points for a 1-year generation time population. Let's plot this out:
-```{r WSP plot}
+Now, we have our **SFF** reference points for a 1-year generation time population. Let's plot this out:
+```{r WSP plot, fig.cap="Relationship between current adults and future recruits and Wild Salmon Policy and Sustainable Fisheries Framework reference points. USR: Upper Stock Reference Point (often 0.8S(MSY)). LRP: Limit Reference Point (here, we used S(GEN)."}
 plot(0:(2*beta),population_model(alpha=alpha,beta=beta,0:(2*beta))$recruits,xlab="Spawners",ylab="Recruits",type="l",lwd=2)
-abline(v=S_msy,lty=2,lwd=2,col="orange3")
+abline(v=0.8*S_msy,lty=2,lwd=2,col="orange3")
 abline(v=Sgen,lty=2,lwd=2,col="red3")
 abline(a=0,b=1,lty=2,lwd=2,col="grey50")
 points(beta,beta,pch=21,bg="grey50",col="black")
@@ -171,13 +173,13 @@ legend("bottomright",c("USR","LRP"),bty="n",lwd=1.5,lty=c(1,1),pch=c(NA,NA),col=
 
 ```
 
-So here we have our *SFF* and *Wild Salmon Policy* reference points for a population that reproduces according to Beverton-Holt dynamics. We used numerical methods (e.g., a univariate optimizer) to find these reference points. Sometimes, this is overkill as there is actually an analytical solution for some population dynamics models. For the Beverton-Holt, for instance, there is! Which just means you can use math to solve for MSY. Specifically, you can solve for the 2nd derivative of the population dynamics model, and then set the 2nd derivative equal to 0 to find where the production function is maximized (or where the rate of change in production is equal to 0).
+So here we have our **SFF** and **Wild Salmon Policy** reference points for a population that reproduces according to Beverton-Holt dynamics. We used numerical methods (e.g., a univariate optimizer) to find these reference points. Sometimes, this is overkill as there is actually an analytical solution for some population dynamics models. For the Beverton-Holt, for instance, there is! Which just means you can use math to solve for MSY. Specifically, you can solve for the 2nd derivative of the population dynamics model, and then set the 2nd derivative equal to 0 to find where the production function is maximized (or where the rate of change in production is equal to 0).
 
 In this parameterization of the Beverton-Holt model (and there are several parameterizations that exist),
 
-$S_{MSY}=(\sqrt\alpha-1)/(\alpha-1)/\beta)$, which for our case is: `r (sqrt(5)-1)/((alpha-1)/beta)`
+$S_{MSY}=(\sqrt\alpha-1)/(\alpha-1)/\beta)$, which for our case is: `r (sqrt(alpha)-1)/((alpha-1)/beta)`
 
-But this doesn't work for all models. And, in our case, numerical solution for $S_{MSY}$ (`r S_msy`) gives a pretty close approximation to the analytical solution (`r (sqrt(5)-1)/((alpha-1)/beta)`) and works in many, many situations.
+But this doesn't work for all models. And, in our case, numerical solution for $S_{MSY}$ (`r S_msy`) gives a pretty close approximation to the analytical solution (`r (sqrt(alpha)-1)/((alpha-1)/beta)`) and works in many, many situations.
 
 # Part II: case study with simulation
 ## Recruitment stochasticity
@@ -200,10 +202,10 @@ where $\rho$ is temporal correlation (bounded $0-1$). If $\rho$ is 0, then annua
 \end{align}
 We illustrate the effects of two kinds of recruitment deviates below using the same random number generator seed:
 
-```{r recruitment stochasticity, echo=TRUE, warning=FALSE, message = FALSE,fig.width=10,fig.height=5}
+```{r recruitment stochasticity, echo=TRUE, warning=FALSE, message = FALSE,fig.height=5,fig.width=7,fig.cap="Population dynamics over time assuming independent recruitment deviates."}
 Nyears <- 40
 seed <- 2025
-rho <- 0.8
+rho <- 0.9
 sigma_r <- 0.5
 set.seed(seed) # sets the random numbers to the same values for everyone
 epsilon <- rnorm(Nyears,mean=0,sd=sigma_r)
@@ -224,7 +226,10 @@ head(data.frame("Adults"=N,"Recruits"=recruits))
 print(c("sd in simulated recruitment (independent)",round(sd(epsilon),2)))
 
 df1 <- data.frame("Year"=1:Nyears,"Adults"=N,"Recruits"=recruits,"variance"="independent")
+```
+Next, we will repeat this but for autocorrelated recruitment. Note the reduced "white noise" or bumpiness in the below plot compared to the above. Instead, "good years" are correlated to subsequent "good years" and "bad years" seem to lead to subsequent "bad years". This pattern is somewhat common in population dynamics due to temporally correlated environmental drivers, like back-to-back El Nino and La Nina years or North Pacific Gyre oscillations.
 
+```{r recruitment stochasticity ar1, echo=TRUE, warning=FALSE, message = FALSE,fig.height=5,fig.width=7,fig.cap="Population dynamics over time assuming autocorrelated recruitment deviates."}
 set.seed(seed) # resets the random numbers
 epsilon <- rnorm(1,mean=0,sd=sigma_r)
 N <- recruits <- rep(NA,Nyears)
@@ -301,8 +306,8 @@ Now, we have our real and our *MLE* estimated reference points. Let's compare an
 ```{r WSP plot estimtes}
 plot(0:(2*beta),population_model(alpha=alpha,beta=beta,0:(2*beta))$recruits,xlab="Spawners",ylab="Recruits",type="l",lwd=2)
 lines(0:(2*beta),population_model(alpha=alpha_est,beta=beta_est,Nadults=0:(2*beta),model="Beverton-Holt")$recruits,type="l",lwd=2,col="dodgerblue")
-abline(v=S_msy,lty=1,lwd=2,col="orange3")
-abline(v=S_msy_est,lty=2,lwd=2,col="orange3")
+abline(v=0.8*S_msy,lty=1,lwd=2,col="orange3")
+abline(v=0.8*S_msy_est,lty=2,lwd=2,col="orange3")
 
 abline(v=Sgen,lty=1,lwd=2,col="red3")
 abline(v=Sgen_est,lty=2,lwd=2,col="red3")
@@ -313,7 +318,7 @@ legend("bottomright",c("Actual","Estimated"),bty="n",lwd=1.5,lty=c(1,2),pch=c(NA
 ```
 
 
-Not bad! Now, we have our reference points. And, we can assess this population in the future and determine status like: is it undergoing overfishing $U_{t}>U_{MSY}$ or it overfished $S_t<S_{MSY}$. Or even, is it at a conservation concern $S_t<S_{GEN}$. Such is the power of the quantitative approach.
+Not bad! Now, we have our reference points. And, we can assess this population in the future and determine status like: is it undergoing overfishing $U_{t}>U_{MSY}$ or it overfished $S_t<0.8S_{MSY}$. Or even, is it at a conservation concern $S_t<S_{GEN}$. Such is the power of the quantitative approach.
 
 ## References
 <div id="refs"></div>
