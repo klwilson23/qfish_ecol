@@ -1,0 +1,578 @@
+---
+title: "Estimating reference points"
+author: "Kyle L. Wilson"
+date: "2026-11-24"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+      number_sections: true
+    theme: journal
+    highlight: espresso
+    fig_retina: 3
+    fig_caption: true
+    fig_width: 7
+    fig_height: 6
+    smart: true
+    df_print: tibble
+  pdf_document:
+    toc: true
+bibliography: current_library.bib
+csl: "conservation-letters.csl"
+filters:
+- type: bib
+  path: current_library.bib
+- type: "pandoc-citeproc"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r source,echo=TRUE,warning = FALSE, message = FALSE}
+library(mvtnorm)
+library(marima)
+library(diagram)
+library(vioplot)
+library(ggplot2)
+```
+# Part 1: Population model
+## Population dynamics
+
+Our population is defined by as a species with a one year generation time with time-dynamics that follows birth (i.e., recruitment *R*) and death processes (i.e., fishing mortality *d*) such that:
+
+\begin{align}
+N_{t}=(1-d_{t})R_{t}
+\end{align}
+
+where $N_{t}$ is the number of adults at time *t*, $R_{t}$ is the number of recruits at time *t*, and $d_{t}$ is the fraction of recruits lost due to some source of mortality (i.e., the cumulative product of marine survival, harvest, or other disturbance). It then follows that $1-d_{t}$ is discrete survival. In many instances for fisheries dynamics, we might model this using continuous rates of mortality $M_t$ and $F_t$ such that: $d_t=1-e^{-M_t+F_t}$ - but lets ignore this for now.
+
+## Beverton-Holt recruitment
+Let's assume that our recruitment dynamics at time *t* depend on adult densities at *t-1*  following a reparameterized Beverton-Holt function based on compensation ratio [see Box 3.1 in @Walters2004] and ignoring age-structure so that we model adult-to-adult dynamics, i.e., setting $\phi_{E_{0}}=1$, $\phi_{B_{0}}=1$ and $R_0=N_0$ [see Table 3 in @Forrest2010]:
+
+\begin{align}
+R_{t}=\cfrac{{\alpha}N_{t-1}}{1+\cfrac{\alpha}{\beta}N_{t-1}}\epsilon_{t}
+\end{align}
+
+where $\alpha$ is the recruitment compensation ratio, $\beta$ is carrying capacity, and $\epsilon_{i,t}$ is lognormally distributed deviates to introduce stochastic recruitment dynamics (@methot_adjusting_2011).
+
+So effectively the number of adults at time *t* is a function of the abundance of adults at a previous time-step *t-1* that survived some potential harvest regime. Let's assume $d_t=0$ to begin:
+\begin{align}
+N_{t}=(1-d_{t})*\cfrac{{\alpha}N_{t-1}}{1+\cfrac{\alpha}{\beta}N_{t-1}}\epsilon_{t}
+\end{align}
+
+```{r recruitment,echo=TRUE}
+alpha <- c(2,4)
+beta <- c(100,200)
+```
+
+For example, take a two different populations that each vary in productivity $\alpha_1=2; \alpha_2=4$ and carrying capacity $\beta_1=100; \beta_2=200$. 
+
+<br>
+```{r recruit curves, echo=TRUE,warning = F, message = F,fig.cap="Density dependence in recruitment dynamics. Dashed line indicates the line of replacement, with equilbrium indicated by points. When populations fall below equilibrium points, per-capita productivity improves driving populations back towards equilibrium. When populations exceed their capacity, per-capita productivity decreases driving populations back towards equilibrium. At each point of the x-axis, the difference between the solid and dashed lines indicates the amount of recruitment above replacement, i.e., the surplus recruitment produced via compensatory density dependence."}
+curve((alpha[1]*x)/(1+((alpha[1]-1)/beta[1])*x),from=0,to=2*beta[2],lwd=2,col="orange",xlab="Adults (t-1)",ylab="Recruits (t)",ylim=1.5*c(0,beta[2]),xlim=2*c(0,beta[2]))
+curve((alpha[2]*x)/(1+((alpha[2]-1)/beta[2])*x),from=0,to=2*beta[2],lwd=2,col="dodgerblue",add=TRUE)
+abline(b=1,a=0,lty=3,lwd=1.5,col="grey50")
+
+curvedarrow(from=c(0.4*beta[2],0.75*beta[2]),to=c(beta[2],beta[2]),lwd=2,lty=1,lcol="black",arr.col="black",curve=-0.075,endhead=TRUE,arr.pos=0.5)
+curvedarrow(from=c(1.575*beta[2],1.1*beta[2]),to=c(beta[2],beta[2]),lwd=2,lty=1,lcol="black",arr.col="black",curve=0.075,endhead=TRUE,arr.pos=0.5)
+
+text(x=0.45*beta[2],y=0.88*beta[2],"Increased productivity",cex=1,srt=25)
+text(x=1.60*beta[2],y=1.20*beta[2],"Decreased productivity",cex=1,srt=8.5)
+
+points(c(beta),c(beta),pch=21,bg=c("orange","dodgerblue"))
+legend("bottomright",c("Population 1","Population 2","Replacement"),bty="n",lwd=1.5,lty=c(1,1,3),pch=c(NA,NA,21),col=c("orange","dodgerblue","grey50"),pt.bg="grey50",cex=0.8)
+
+```
+
+## Sustainable Fisheries Framework: reference points
+The SFF and updates to the Fisheries Act ask that reference points be established for Canada's major fisheries. Reference points delinates zones of risk: from 'healthy' to 'cautious' and from 'cautious' to 'concern' (red). These two reference points are referred to as the **Upper Stock Reference Point** and the **Limit Reference Point**
+
+Based on these $\alpha$ and $\beta$ demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield. Others might be based on fractions of *carrying capacity*: but this depends on whether we are interested in the *recruits at carrying capacity* $R_0$ or *spawners at carrying capacity* ($N_0$). In this version of the recruitment model, $\beta=R_{0}=N_{0}$ because, when adult mortality is $d_t=0$, then we are only modelling how current spawning adults create future spawning adults. Sometimes, we are modelling how current spawning adult abundances (or spawner biomass) create future juveniles (either in abundance or biomass) and $R_{0} \neq N_{0}$.
+
+### Beverton-Holt and Ricker: two sides of the same coin
+Let's make a function that let's us tap into the same input parameters, but ask what the expected recruits would be under assumptions of a *Beverton-Holt* compared to a *Ricker* model. We will start with *Beverton-Holt*, but its easy to change this later. The point is that the numerical methods we learn below work the same between any population dynamics models that we choose, just requires different equations on the *r.h.s* of things. We will work with a population that has $\alpha=5$ and *spawners at carrying capacity* $\beta=200$
+
+```{r recruitment function, fig.cap="Comparison between Beverton-Holt and Ricker recruitment model."}
+alpha <- 5
+beta <- 200
+population_model <- function(alpha,beta,Nadults,model="Beverton-Holt")
+{
+  if(model=="Beverton-Holt")
+  {
+    # population model is R ~ (CR * S)/(1+(CR-1)/K * S): reparameterized Beverton-Holt
+    recruits <- (alpha*Nadults)/(1+((alpha-1)/beta)*Nadults)
+  }
+  if(model=="Ricker")
+  {
+    # population model is R ~ CR * S * e(-log(CR)/K * S): reparameterized Ricker
+    recruits <- alpha*Nadults*exp(-log(alpha)/beta*Nadults)
+  }
+  return(list("recruits"=recruits))
+}
+
+curve(population_model(alpha=alpha,beta=beta,Nadults=x,model="Beverton-Holt")$recruits,from=0,to=2*beta,lwd=2,col="orange",xlab="Adults (t-1)",ylab="Recruits (t)",ylim=c(0,2*beta))
+curve(population_model(alpha=alpha,beta=beta,Nadults=x,model="Ricker")$recruits,from=0,to=2*beta,lwd=2,col="dodgerblue",add=TRUE)
+abline(b=1,a=0,lty=3,lwd=1.5,col="grey50")
+points(c(beta,beta),c(beta,beta),pch=21,bg="grey50",col="black")
+legend("bottomright",c("Beverton-Holt","Ricker","Replacement"),bty="n",lwd=1.5,lty=c(1,1,3),pch=c(NA,NA,21),col=c("orange","dodgerblue","grey50"),pt.bg="grey50",cex=0.8)
+
+```
+
+### MSY
+Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population. It is a very helpful thing to know about the population, and it has a clear numerical solution as it occurs at the *maximum* of a yield curve. The *SFF* and Wild Salmon Policy (*WSP*) delineate healthy from not healthy fish populations using the *USR* - de facto DFO policies sets the *USR* to be $0.8S_{MSY}$ for reasons that aren't well established. The United States NOAA National Marine Fisheries Service, for instance, uses $S_{MSY}$. Where the missing 20% went, who knows but see @Frid2023 for our thoughts.
+
+The key word in *MSY* is *sustainable*: the yield must be one we can take every year, forever. At equilibrium, the spawners left after harvest must exactly replace themselves, so the yield we can take is whatever recruitment is produced *above* replacement, i.e., the surplus production $R(S)-S$. This is the gap between the recruitment curve and the replacement line in the first figure. So, we can find $S_{MSY}$ by searching over spawner abundance for the maximum surplus produced, and then back out $MSY=R(S_{MSY})-S_{MSY}$ and the exploitation rate that achieves it, $U_{MSY}=MSY/R(S_{MSY})$.
+
+For our parameterization of the Beverton-Holt model there is a closed-form solution for MSY, found by setting the first derivative of surplus production to zero, i.e., $\frac{d}{dS}\left[R(S)-S\right]=0$: $S_{MSY}=\beta\frac{\sqrt{\alpha}-1}{\alpha-1}$, $U_{MSY}=1-\frac{1}{\sqrt{\alpha}}$, and $MSY=\beta\frac{(\sqrt{\alpha}-1)^2}{\alpha-1}$. The Ricker model has no closed-form solution in elementary functions, but there is an exact solution using the Lambert *W* function (@Scheuerell2016): $S_{MSY}=\beta\frac{1-W(e/\alpha)}{\log(\alpha)}$ and $U_{MSY}=1-W(e/\alpha)$. Here, we will use the numerical method because it works for any population model we choose: all it needs is our `population_model` function.
+
+```{r MSY, fig.cap="Surplus production curve indicating the amount of total catch (numbers or biomass) that can be taken at equilibrium given a certain number of spawners left to reproduce. The peak of this curve indicates the maximum sustainable yield that can be extracted from this population in perpetuity, given no changes in their demographics, etc."}
+smsy_find <- function(S_x,alpha,beta,model="Beverton-Holt")
+{
+  recruits <- population_model(alpha=alpha,beta=beta,Nadults=S_x,model=model)$recruits
+  surplus <- recruits-S_x # recruits above replacement are available to harvest
+  return(surplus)
+}
+
+curve(smsy_find(S_x=x,alpha=alpha,beta=beta),from=0,to=beta,xlab="Spawners",ylab="Yield (surplus production)")
+S_msy <- optimize(smsy_find,c(0,beta),tol=0.0001,alpha=alpha,beta=beta,maximum = TRUE)$maximum
+R_msy <- population_model(alpha=alpha,beta=beta,Nadults=S_msy,model="Beverton-Holt")$recruits
+MSY <- R_msy-S_msy
+umsy <- MSY/R_msy
+
+data.frame("U"=umsy,"Smsy"=S_msy,"MSY"=MSY)
+```
+### Limit reference point: S(gen)
+Then, we will estimate one version of a *Limit Reference Point* called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation based on its current productivity. It is a conservation-based benchmark and lets us know how depleted the population can get before we need to curtail harvest while still maintaining the ability to get back to MSY fairly quick.
+
+```{r Sgen}
+Sgen_find <- function(Smsy,Sgen,alpha,beta)
+{
+  (Smsy-population_model(alpha=alpha,beta=beta,Nadults=Sgen,model="Beverton-Holt")$recruits)^2
+}
+
+Sgen <- optimize(Sgen_find,c(0,S_msy),tol=0.0001,Smsy=S_msy,alpha=alpha,beta=beta)$minimum
+Sgen
+```
+
+### Reference points: visualized
+Now, we have our **SFF** reference points for a 1-year generation time population. Let's plot this out:
+```{r WSP plot, fig.cap="Relationship between current adults and future recruits and Wild Salmon Policy and Sustainable Fisheries Framework reference points. USR: Upper Stock Reference Point (often 0.8S(MSY)). LRP: Limit Reference Point (here, we used S(GEN)."}
+plot(0:(2*beta),population_model(alpha=alpha,beta=beta,0:(2*beta))$recruits,xlab="Spawners",ylab="Recruits",type="l",lwd=2)
+abline(v=0.8*S_msy,lty=2,lwd=2,col="orange3")
+abline(v=Sgen,lty=2,lwd=2,col="red3")
+abline(a=0,b=1,lty=2,lwd=2,col="grey50")
+points(beta,beta,pch=21,bg="grey50",col="black")
+legend("bottomright",c("USR","LRP"),bty="n",lwd=1.5,lty=c(1,1),pch=c(NA,NA),col=c("orange3","red3"),cex=0.8)
+
+```
+
+So here we have our **SFF** and **Wild Salmon Policy** reference points for a population that reproduces according to Beverton-Holt dynamics. We used numerical methods (e.g., a univariate optimizer called `optimize`) to find these reference points. As noted above, this is sometimes overkill because the Beverton-Holt model has a closed-form solution. In our case, the numerical solution for $S_{MSY}$ (`r round(S_msy,2)`) matches the closed-form solution $\beta\frac{\sqrt{\alpha}-1}{\alpha-1}$ (`r round(beta*(sqrt(alpha)-1)/(alpha-1),2)`), and the numerical approach works in many, many situations where no closed-form solution exists.
+
+# Part II: case study with simulation
+## Recruitment stochasticity
+We can model stochastic recruitment and, in this case, we will use a lognormal distribution with average variation in recruitment of $\sigma_R$. In cases with stochastic recruitment, the deterministic recruitment becomes:
+
+\begin{align}
+R_{t}=\cfrac{{\alpha}N_{t-1}}{1+\cfrac{{\alpha}}{\beta}N_{t-1}}e^{\epsilon_{t}-\cfrac{\sigma_{R}^2}{2}}
+\end{align}
+
+where lognormal deviates at time *t* is drawn from a normal distribution (*N*) with bias correction $\cfrac{\sigma_{R}^2}{2}$. If $\sigma_R$ is low, then population dynamics approach the deterministic case. In some scenarios, we may want to evaluate the role of temporally correlated recruitment deviates to model potential drivers synchronous or correlated dynamics. Expected recruitment deviates can follow a first-order autoregressive model such that:
+
+\begin{align}
+\epsilon_{t}=\rho\epsilon_{t-1}+N(\mu=0,\sigma=\sqrt{\sigma_R^2(1-\rho^2)})
+\end{align}
+
+
+where $\rho$ is temporal correlation (bounded $0-1$). If $\rho$ is 0, then annual recruitment deviates were independent. We modelled the initial conditions for autoregressive recruitment deviates $\epsilon_{1}$ by drawing from a stationary normal distribution with mean $\mu=0$ and variance $\sigma_R^2$ such that:
+\begin{align}
+\epsilon_{1} \sim N(\mu=0,\sigma=\sigma_R)
+\end{align}
+We illustrate the effects of two kinds of recruitment deviates below using the same random number generator seed:
+
+```{r recruitment stochasticity, echo=TRUE, warning=FALSE, message = FALSE,fig.height=5,fig.width=7,fig.cap="Population dynamics over time assuming independent recruitment deviates."}
+Nyears <- 40
+seed <- 2025
+rho <- 0.9
+sigma_r <- 0.5
+set.seed(seed) # sets the random numbers to the same values for everyone
+epsilon <- rnorm(Nyears,mean=0,sd=sigma_r)
+N <- recruits <- rep(NA,Nyears)
+N[1] <- beta
+recruits[1] <- alpha*N[1]/(1+((alpha-1)/beta)*N[1])*exp(epsilon[1])
+for(t in 2:Nyears)
+{
+  N[t] <- recruits[t-1]
+  recruits[t] <- alpha*N[t]/(1+((alpha-1)/beta)*N[t])*exp(epsilon[t]-(sigma_r^2)/2)
+}
+layout(matrix(1:2,ncol=2))
+plot(1:Nyears,recruits,xlab="Time",ylim=range(c(0,recruits)),type="l")
+plot(N,recruits,xlim=range(c(0,N)),ylim=range(c(0,recruits)))
+curve((alpha*x)/(1+((alpha-1)/beta)*x),from=0,lwd=2,col="dodgerblue",add=TRUE)
+head(data.frame("Adults"=N,"Recruits"=recruits))
+
+print(c("sd in simulated recruitment (independent)",round(sd(epsilon),2)))
+
+df1 <- data.frame("Year"=1:Nyears,"Adults"=N,"Recruits"=recruits,"variance"="independent")
+```
+Next, we will repeat this but for autocorrelated recruitment. Note the reduced "white noise" or bumpiness in the below plot compared to the above. Instead, "good years" are correlated to subsequent "good years" and "bad years" seem to lead to subsequent "bad years". This pattern is somewhat common in population dynamics due to temporally correlated environmental drivers, like back-to-back El Nino and La Nina years or North Pacific Gyre oscillations.
+
+```{r recruitment stochasticity ar1, echo=TRUE, warning=FALSE, message = FALSE,fig.height=5,fig.width=7,fig.cap="Population dynamics over time assuming autocorrelated recruitment deviates."}
+set.seed(seed) # resets the random numbers
+epsilon <- rnorm(1,mean=0,sd=sigma_r)
+N <- recruits <- rep(NA,Nyears)
+N[1] <- beta
+recruits[1] <- alpha*N[1]/(1+((alpha-1)/beta)*N[1])*exp(epsilon[1])
+for(t in 2:Nyears)
+{
+  epsilon[t] <- rho*epsilon[t-1] + rnorm(1,mean=0,sd=sqrt((sigma_r^2)*(1-rho^2)))
+  N[t] <- recruits[t-1]
+  recruits[t] <- alpha*N[t]/(1+((alpha-1)/beta)*N[t])*exp(epsilon[t]-(sigma_r^2)/2)
+}
+
+layout(matrix(1:2,ncol=2))
+plot(1:Nyears,recruits,xlab="Time",ylim=range(c(0,recruits)),type="l")
+plot(N,recruits,xlim=range(c(0,N)),ylim=range(c(0,recruits)))
+curve((alpha*x)/(1+((alpha-1)/beta)*x),from=0,lwd=2,col="dodgerblue",add=TRUE)
+head(data.frame("Adults"=N,"Recruits"=recruits))
+
+print(c("sd in simulated recruitment (correlated)",round(sd(epsilon),2)))
+
+df2 <- data.frame("Year"=1:Nyears,"Adults"=N,"Recruits"=recruits,"variance"="correlated")
+
+df <- rbind(df1,df2)
+```
+
+## Estimating recruitment model
+Let's estimate the Beverton-Holt model by fitting it to our simulated stock-recruit dataset. We can assume the *independent* correlation structure for now, but really we would just revise the equation for $\mu$ below. Here, we are using the R function called `optim` in order to find the *most likely* fit of a Beverton-Holt model to this dataset, presuming a *lognormal* error structure. `optim` is just another numerical tool to find the *minimum* or *maximum* solution to a problem. 
+
+First, we will creating a function called `mle_fit` and get `R` to solve this for us on our behalf. We then read in potential starting parameters for $\alpha$ and $\beta$, and this will let `optim` to get going. Understanding how functions work in R is the main trick here, and may take some time.
+
+For our purposes, we will apply the bias-correction term $\sigma^2/2$ by subtracting that from the log of the mean expected recruitment $log_e(\mu)$. This is a common approach to adjust estimated recruitment curves in the face of noisy stock-recruitment data (assuming lognormally distributed error) used in fisheries assessments (@methot_adjusting_2011).
+
+```{r optim}
+
+df_sub <- df[df$variance=="independent",]
+mle_fit <- function(par,dataset)
+{
+  # theta <- start
+  alpha <- exp(par[1])
+  beta <- par[2]
+  sigma <- exp(par[3])
+  # data <- df_sub
+  mu <- (alpha*dataset$Adults)/(1+((alpha-1)/beta)*dataset$Adults)
+  log_lik <- dlnorm(x=dataset$Recruits,meanlog=log(mu)-((sigma^2)/2),sdlog=sigma,log=TRUE)
+  nll <- -sum(log_lik)
+  return(nll)
+}
+start <- c(log(2),mean(df_sub$Recruits),0)
+fit <- optim(par=start,fn=mle_fit,dataset=df_sub,method="BFGS",hessian=TRUE)
+par <- fit$par
+alpha_est <- exp(par[1])
+beta_est <- par[2]
+sigma_est <- exp(par[3])
+
+parameters <- data.frame("alpha"=c(alpha,alpha_est),"beta"=c(beta,beta_est),"sigma"=c(sigma_r,sigma_est),"type"=c("true","estimate"))
+parameters
+```
+
+### Estimating MSY from model fit
+Once we have the *MLE* solutions for $\alpha$ and $\beta$ for our presumed Beverton-Holt model, we have all the ingredients we need to then estimate our fishery reference points.
+```{r estimating MSY and Sgen}
+curve(smsy_find(S_x=x,alpha=alpha_est,beta=beta_est),from=0,to=beta_est,xlab="Spawners",ylab="Yield (surplus production)")
+S_msy_est <- optimize(smsy_find,c(0,beta_est),tol=0.0001,alpha=alpha_est,beta=beta_est,maximum = TRUE)$maximum
+R_msy_est <- population_model(alpha=alpha_est,beta=beta_est,Nadults=S_msy_est,model="Beverton-Holt")$recruits
+MSY_est <- R_msy_est-S_msy_est
+umsy_est <- MSY_est/R_msy_est
+
+Sgen_est <- optimize(Sgen_find,c(0,S_msy_est),tol=0.0001,Smsy=S_msy_est,alpha=alpha_est,beta=beta_est)$minimum
+
+data.frame("Type"=c("Actual","Estimated"),"U"=c(umsy,umsy_est),"Smsy"=c(S_msy,S_msy_est),"MSY"=c(MSY,MSY_est),"Sgen"=c(Sgen,Sgen_est))
+```
+
+### Visualizing real versus estimated reference points
+Now, we have our real and our *MLE* estimated reference points. Let's compare and see how we did.
+```{r WSP plot estimates, fig.cap="Adult and recruitment relationship with actual versus estimated (via maximum likelihood) SFF policy reference points."}
+plot(0:(2*beta),population_model(alpha=alpha,beta=beta,0:(2*beta))$recruits,xlab="Spawners",ylab="Recruits",type="l",lwd=2)
+lines(0:(2*beta),population_model(alpha=alpha_est,beta=beta_est,Nadults=0:(2*beta),model="Beverton-Holt")$recruits,type="l",lwd=2,col="dodgerblue")
+abline(v=0.8*S_msy,lty=1,lwd=2,col="orange3")
+abline(v=0.8*S_msy_est,lty=2,lwd=2,col="orange3")
+
+abline(v=Sgen,lty=1,lwd=2,col="red3")
+abline(v=Sgen_est,lty=2,lwd=2,col="red3")
+
+abline(b=1,a=0,lty=5,col="black")
+legend("bottomright",c("Actual","Estimated"),bty="n",lwd=1.5,lty=c(1,2),pch=c(NA,NA),col=c("black","dodgerblue"),cex=0.8)
+
+```
+
+
+Not bad! Now, we have our reference points estimated (with uncertainty, but we don't calculate that here) from a `r Nyears` year time-series. And, we can assess this population in the future and determine status like: is it undergoing overfishing $U_{t}>U_{MSY}$ or it overfished $S_t<0.8S_{MSY}$. Or even, is it at a conservation concern $S_t<S_{GEN}$. Such is the power of the quantitative approach.
+
+If interested, we could revisit all of the above estimation assuming Ricker instead of Beverton-Holt dynamics. Or, assuming correlated versus independent recruitment deviates. Feel free to play around.
+
+
+# Part III: Pacific salmon simulation-estimation
+## Semelparous life history with mixed ages-at-return
+In Part I and II, we assumed a one year generation time where recruits at time *t* become the spawning adults at time *t+1*. Pacific salmon are semelparous (they spawn once and die) and their offspring return to spawn after spending several years in freshwater and the ocean. So the recruits produced by spawners in brood year *y* do not all come back in the same year. Instead, a fraction $p_a$ of them return at age *a*, such that the total return in calendar year *t* is the sum of recruits from three previous brood years:
+
+\begin{align}
+N_{t}=\sum_{a=3}^{5}p_{a}R_{t-a}
+\end{align}
+
+where $p_3+p_4+p_5=1$ and the mean generation time (i.e., weighted average lag) is $\bar{a}=\sum_a{a\,p_a}$. The fishery then harvests a fraction $U_t$ of that return, leaving $S_t=(1-U_t)N_t$ spawners and a catch of $C_t=U_tN_t$. Spawners then produce recruits following the same Beverton-Holt (or Ricker) model that we used above, with independent lognormal recruitment deviates:
+
+\begin{align}
+R_{t}=f(S_t;CR,K)\,e^{\epsilon_{t}-\cfrac{\sigma_{R}^2}{2}},\quad \epsilon_{t} \sim N(0,\sigma_R)
+\end{align}
+
+We will simulate a population with a compensation ratio $CR=3.5$ and carrying capacity $K=5000$ spawners, and fix the proportions-at-age so that the mean generation time is 4.2 years. Change `sr_model` to `"Ricker"` to toggle the recruitment model for the whole of Part III (simulation, estimation, and reference points).
+
+```{r salmon parameters}
+CR <- 3.5 # compensation ratio
+K <- 5000 # spawners at carrying capacity
+sr_model <- "Beverton-Holt" # toggle: "Beverton-Holt" or "Ricker"
+
+ages <- c(3,4,5)
+p_age <- c(0.15,0.50,0.35) # fixed proportions-at-age (sum to 1)
+gen_time <- sum(ages*p_age) # weighted average lag-time = 4.2 years
+
+sigma_r <- 0.6 # sd of independent lognormal recruitment deviates
+Nyears <- 40 # years of observed data
+Nburn <- max(ages) # burn-in years to fill in the age-structure at unfished equilibrium
+Tyears <- Nburn+Nyears
+U_range <- c(0.2,0.7) # range of annual exploitation rates
+
+data.frame("Age"=ages,"Proportion"=p_age,"Generation_time"=gen_time)
+```
+
+Note that we add a fishery with exploitation rates that vary randomly from year to year between `r U_range[1]` and `r U_range[2]`. Without harvest, spawners stay close to *K* and the data contain little information about recruitment at low spawner abundance (i.e., about $CR$). Contrast in spawner abundance is what lets us estimate both parameters.
+
+## Simulating one spawner-recruit time-series
+We start the population at unfished equilibrium ($S=R=K$) for the first `r Nburn` years so that all three brood years contributing to the first returns exist. Then, each year, we: (1) add up the returns at age from previous brood years; (2) harvest; and (3) produce new recruits from the spawners that escaped the fishery.
+
+```{r salmon simulation, fig.height=5, fig.width=7, fig.cap="One simulated salmon time-series. Left: total returns (black), spawners (orange), and catch (grey) over time. Right: spawners versus total recruits by brood year with the true recruitment curve."}
+set.seed(seed)
+epsilon <- rnorm(Tyears,mean=0,sd=sigma_r) # independent recruitment deviates
+U <- runif(Tyears,min=U_range[1],max=U_range[2]) # exploitation rates
+U[1:Nburn] <- 0
+
+S <- R <- N <- C <- rep(NA,Tyears)
+returns_age <- matrix(NA,nrow=Tyears,ncol=length(ages)) # returns by calendar year (rows) and age (columns)
+
+# burn-in years at unfished equilibrium
+S[1:Nburn] <- K
+R[1:Nburn] <- K
+N[1:Nburn] <- K
+C[1:Nburn] <- 0
+
+for(t in (Nburn+1):Tyears)
+{
+  # 1. returns at age from brood years t-3, t-4, t-5
+  for(a in 1:length(ages))
+  {
+    returns_age[t,a] <- p_age[a]*R[t-ages[a]]
+  }
+  N[t] <- sum(returns_age[t,])
+  # 2. harvest
+  C[t] <- U[t]*N[t]
+  S[t] <- (1-U[t])*N[t]
+  # 3. recruitment from this year's spawners
+  R[t] <- population_model(alpha=CR,beta=K,Nadults=S[t],model=sr_model)$recruits*exp(epsilon[t]-(sigma_r^2)/2)
+}
+
+# keep the observed years only (drop the burn-in)
+obs_years <- (Nburn+1):Tyears
+df_salmon <- data.frame("Year"=1:Nyears,"Returns"=N[obs_years],"Spawners"=S[obs_years],"Catch"=C[obs_years],"U"=U[obs_years])
+head(df_salmon)
+```
+
+## Binding stock and recruitment by brood year
+In a real salmon assessment, we never see $R_t$ directly. We observe spawners and returns-at-age in each calendar year (e.g., from escapement surveys, catch, and scale or otolith ages), then reconstruct a *brood table* by summing up the age-3, age-4, and age-5 returns that came from each brood year: $R_y=N_{y+3,3}+N_{y+4,4}+N_{y+5,5}$. The last `r max(ages)` brood years are incomplete (not all their offspring have returned yet), so we drop them.
+
+```{r brood table}
+brood_years <- (Nburn+1):(Tyears-max(ages)) # complete brood years only
+recruits_brood <- rep(NA,length(brood_years))
+for(i in 1:length(brood_years))
+{
+  y <- brood_years[i]
+  recruits_brood[i] <- returns_age[y+ages[1],1]+returns_age[y+ages[2],2]+returns_age[y+ages[3],3]
+}
+
+brood_table <- data.frame("BroodYear"=brood_years-Nburn,"Spawners"=S[brood_years],"Recruits"=recruits_brood)
+head(brood_table)
+
+layout(matrix(1:2,ncol=2))
+plot(df_salmon$Year,df_salmon$Returns,type="l",lwd=2,xlab="Year",ylab="Abundance",ylim=range(c(0,df_salmon$Returns)))
+lines(df_salmon$Year,df_salmon$Spawners,lwd=2,col="orange")
+lines(df_salmon$Year,df_salmon$Catch,lwd=2,col="grey50")
+legend("topright",c("Returns","Spawners","Catch"),bty="n",lwd=2,col=c("black","orange","grey50"),cex=0.8)
+plot(brood_table$Spawners,brood_table$Recruits,xlim=c(0,max(brood_table$Spawners)),ylim=range(c(0,brood_table$Recruits)),xlab="Spawners",ylab="Recruits",pch=21,bg="grey80")
+curve(population_model(alpha=CR,beta=K,Nadults=x,model=sr_model)$recruits,from=0,lwd=2,col="dodgerblue",add=TRUE)
+abline(b=1,a=0,lty=3,lwd=1.5,col="grey50")
+```
+
+## Estimating CR and K
+Now, we fit the stock-recruit model to the brood table using `optim`, just like in Part II. The only differences are that: (1) we pass `sr_model` to our `population_model` function so the likelihood uses the same recruitment model as the simulation; and (2) we estimate $K$ on the log-scale (i.e., `beta <- exp(par[2])`), which keeps it positive and helps `optim` when *K* is in the thousands.
+
+```{r salmon optim}
+mle_fit_salmon <- function(par,dataset,model="Beverton-Holt")
+{
+  alpha <- exp(par[1])
+  beta <- exp(par[2])
+  sigma <- exp(par[3])
+  mu <- population_model(alpha=alpha,beta=beta,Nadults=dataset$Spawners,model=model)$recruits
+  log_lik <- dlnorm(x=dataset$Recruits,meanlog=log(mu)-((sigma^2)/2),sdlog=sigma,log=TRUE)
+  nll <- -sum(log_lik)
+  return(nll)
+}
+start <- c(log(2),log(mean(brood_table$Recruits)),0)
+fit <- optim(par=start,fn=mle_fit_salmon,dataset=brood_table,model=sr_model,method="BFGS",hessian=TRUE)
+CR_est <- exp(fit$par[1])
+K_est <- exp(fit$par[2])
+sigma_est <- exp(fit$par[3])
+
+data.frame("CR"=c(CR,CR_est),"K"=c(K,K_est),"sigma"=c(sigma_r,sigma_est),"type"=c("true","estimate"))
+```
+
+## Estimating Umsy and MSY
+With the estimates of $CR$ and $K$ we can use our `smsy_find` function from Part I to estimate $U_{MSY}$, $S_{MSY}$, and $MSY$, and compare these to the values from the true parameters. Because the proportions-at-age are fixed and sum to 1, the equilibrium of the age-structured salmon population is the same as the equilibrium of the spawner-to-recruit curve: at steady state, every brood year produces the same recruitment, so the age mix of the returns does not change the surplus production.
+
+```{r salmon MSY}
+S_msy_true <- optimize(smsy_find,c(0,K),tol=0.0001,alpha=CR,beta=K,model=sr_model,maximum=TRUE)$maximum
+R_msy_true <- population_model(alpha=CR,beta=K,Nadults=S_msy_true,model=sr_model)$recruits
+MSY_true <- R_msy_true-S_msy_true
+umsy_true <- MSY_true/R_msy_true
+
+S_msy_est <- optimize(smsy_find,c(0,K_est),tol=0.0001,alpha=CR_est,beta=K_est,model=sr_model,maximum=TRUE)$maximum
+R_msy_est <- population_model(alpha=CR_est,beta=K_est,Nadults=S_msy_est,model=sr_model)$recruits
+MSY_est <- R_msy_est-S_msy_est
+umsy_est <- MSY_est/R_msy_est
+
+data.frame("Type"=c("Actual","Estimated"),"U"=c(umsy_true,umsy_est),"Smsy"=c(S_msy_true,S_msy_est),"MSY"=c(MSY_true,MSY_est))
+```
+
+## Repeating for 100 simulations
+One simulated dataset tells us little about how well our estimation model performs, because any single time-series could be lucky or unlucky. So, we repeat the whole process (simulate, build the brood table, fit, and estimate reference points) 100 times. Each simulation uses a new set of recruitment deviates and exploitation rates, but the same true $CR$, $K$, and proportions-at-age. We save the estimates from each simulation into a data frame.
+
+```{r salmon simulation loop, warning=FALSE}
+Nsims <- 100
+set.seed(seed)
+sim_results <- data.frame("Sim"=1:Nsims,"CR"=NA,"K"=NA,"sigma"=NA,"U"=NA,"Smsy"=NA,"MSY"=NA,"convergence"=NA)
+
+for(sim in 1:Nsims)
+{
+  # simulate the population
+  epsilon <- rnorm(Tyears,mean=0,sd=sigma_r)
+  U <- runif(Tyears,min=U_range[1],max=U_range[2])
+  U[1:Nburn] <- 0
+  S <- R <- N <- C <- rep(NA,Tyears)
+  returns_age <- matrix(NA,nrow=Tyears,ncol=length(ages))
+  S[1:Nburn] <- K
+  R[1:Nburn] <- K
+  for(t in (Nburn+1):Tyears)
+  {
+    for(a in 1:length(ages))
+    {
+      returns_age[t,a] <- p_age[a]*R[t-ages[a]]
+    }
+    N[t] <- sum(returns_age[t,])
+    C[t] <- U[t]*N[t]
+    S[t] <- (1-U[t])*N[t]
+    R[t] <- population_model(alpha=CR,beta=K,Nadults=S[t],model=sr_model)$recruits*exp(epsilon[t]-(sigma_r^2)/2)
+  }
+
+  # bind spawners and recruits into a brood table
+  recruits_brood <- rep(NA,length(brood_years))
+  for(i in 1:length(brood_years))
+  {
+    y <- brood_years[i]
+    recruits_brood[i] <- returns_age[y+ages[1],1]+returns_age[y+ages[2],2]+returns_age[y+ages[3],3]
+  }
+  brood_table <- data.frame("BroodYear"=brood_years-Nburn,"Spawners"=S[brood_years],"Recruits"=recruits_brood)
+
+  # fit the stock-recruit model
+  start <- c(log(2),log(mean(brood_table$Recruits)),0)
+  fit <- optim(par=start,fn=mle_fit_salmon,dataset=brood_table,model=sr_model,method="BFGS")
+  CR_est <- exp(fit$par[1])
+  K_est <- exp(fit$par[2])
+  sigma_est <- exp(fit$par[3])
+
+  # estimate reference points
+  S_msy_est <- optimize(smsy_find,c(0,K_est),tol=0.0001,alpha=CR_est,beta=K_est,model=sr_model,maximum=TRUE)$maximum
+  R_msy_est <- population_model(alpha=CR_est,beta=K_est,Nadults=S_msy_est,model=sr_model)$recruits
+  MSY_est <- R_msy_est-S_msy_est
+  umsy_est <- MSY_est/R_msy_est
+
+  # save
+  sim_results[sim,2:8] <- c(CR_est,K_est,sigma_est,umsy_est,S_msy_est,MSY_est,fit$convergence)
+}
+
+head(sim_results)
+print(c("simulations that converged",sum(sim_results$convergence==0),"of",Nsims))
+```
+
+## Comparing estimates to truth
+We summarize estimation performance with the relative error $(\hat{\theta}-\theta)/\theta$ for each parameter $\theta$ in each simulation. Values centred on zero mean the estimator is unbiased; the spread tells us how precise it is given `r nrow(brood_table)` brood years of data and $\sigma_R=$ `r sigma_r`.
+
+```{r salmon sim summary}
+truth <- c("CR"=CR,"K"=K,"sigma"=sigma_r,"U"=umsy_true,"Smsy"=S_msy_true,"MSY"=MSY_true)
+rel_error <- data.frame("CR"=(sim_results$CR-CR)/CR,
+                        "K"=(sim_results$K-K)/K,
+                        "sigma"=(sim_results$sigma-sigma_r)/sigma_r,
+                        "U"=(sim_results$U-umsy_true)/umsy_true,
+                        "Smsy"=(sim_results$Smsy-S_msy_true)/S_msy_true,
+                        "MSY"=(sim_results$MSY-MSY_true)/MSY_true)
+
+data.frame("Parameter"=names(truth),
+           "Truth"=round(truth,3),
+           "Median_estimate"=round(apply(sim_results[,names(truth)],2,median),3),
+           "Lower_95"=round(apply(sim_results[,names(truth)],2,quantile,probs=0.025),3),
+           "Upper_95"=round(apply(sim_results[,names(truth)],2,quantile,probs=0.975),3),
+           "Median_rel_error"=round(apply(rel_error,2,median),3),
+           row.names=NULL)
+```
+
+```{r salmon sim violin, fig.height=5, fig.cap="Relative error in estimated parameters and reference points across 100 simulations. Violins show the distribution of relative errors, boxes show the median and interquartile range. The dashed line at zero indicates no error (i.e., estimate equals truth). Note: the y-axis only spans to -100% to +200% - but a few extreme estimates of CR fall outside this range but are still included in the violins and boxes."}
+# stack the relative errors into long format for ggplot
+df_rel_error <- data.frame("Parameter"=rep(names(rel_error),each=Nsims),
+                           "Relative_error"=unlist(rel_error),
+                           "Type"=rep(c("Stock-recruit parameter","Stock-recruit parameter","Recruitment variation","Reference point","Reference point","Reference point"),each=Nsims))
+df_rel_error$Parameter <- factor(df_rel_error$Parameter,levels=names(rel_error))
+df_rel_error$Type <- factor(df_rel_error$Type,levels=c("Stock-recruit parameter","Recruitment variation","Reference point"))
+
+ggplot(df_rel_error,aes(x=Parameter,y=Relative_error,fill=Type)) +
+  geom_hline(yintercept=0,linetype=2,linewidth=0.6,colour="grey30") +
+  geom_violin(colour=NA,alpha=0.7,scale="width",width=0.8) +
+  geom_boxplot(width=0.15,outlier.shape=NA,fill="white",colour="grey20",linewidth=0.4) +
+  scale_fill_manual(values=c("dodgerblue","grey70","orange")) +
+  scale_x_discrete(labels=c("CR"="CR","K"="K","sigma"=expression(sigma[R]),"U"=expression(U[MSY]),"Smsy"=expression(S[MSY]),"MSY"="MSY")) +
+  scale_y_continuous(labels=scales::percent) +
+  coord_cartesian(ylim=c(-1,2)) +
+  labs(x=NULL,y="Relative error",fill=NULL,title=paste0(sr_model," (",Nsims," simulations)")) +
+  theme_classic(base_size=13) +
+  theme(legend.position="top",plot.title=element_text(size=12))
+
+```
+
+```{r salmon sim curves, fig.cap="Estimated recruitment curves from each of the 100 simulations (thin blue lines) compared to the true recruitment curve (black). Dashed line indicates replacement."}
+plot(0:(2*K),population_model(alpha=CR,beta=K,Nadults=0:(2*K),model=sr_model)$recruits,type="l",lwd=3,xlab="Spawners",ylab="Recruits",ylim=c(0,2*K))
+for(sim in 1:Nsims)
+{
+  lines(0:(2*K),population_model(alpha=sim_results$CR[sim],beta=sim_results$K[sim],Nadults=0:(2*K),model=sr_model)$recruits,col=adjustcolor("dodgerblue",alpha.f=0.25))
+}
+lines(0:(2*K),population_model(alpha=CR,beta=K,Nadults=0:(2*K),model=sr_model)$recruits,lwd=3)
+abline(b=1,a=0,lty=3,lwd=1.5,col="grey50")
+legend("bottomright",c("True","Estimated"),bty="n",lwd=c(3,1),col=c("black","dodgerblue"),cex=0.8)
+```
+
+How did we do? Some things to explore by changing the inputs at the top of Part III:
+
+- Toggle `sr_model` to `"Ricker"` and re-run.
+- Increase `sigma_r` or shorten `Nyears` and see how precision in $CR$ and $U_{MSY}$ degrades.
+- Narrow `U_range` (e.g., `c(0.4,0.5)`) to reduce contrast in spawner abundance and watch the estimates of $CR$ and $K$ become correlated and biased.
+- Fit a Beverton-Holt model to data simulated from a Ricker (or vice versa) to explore the consequences of getting the model structure wrong.
+
+## References
+<div id="refs"></div>
