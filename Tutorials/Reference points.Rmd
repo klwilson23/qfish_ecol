@@ -2,7 +2,7 @@
 title: "Estimating reference points"
 author: "Kyle L. Wilson"
 date: "2025-10-11"
-output: 
+output:
   html_document:
     toc: true
     toc_float:
@@ -17,12 +17,14 @@ output:
     fig_height: 6
     smart: true
     df_print: tibble
+  pdf_document:
+    toc: true
 bibliography: current_library.bib
-csl: conservation-letters.csl
+csl: "conservation-letters.csl"
 filters:
-  - type: bib
-    path: "current_library.bib"
-  - type: pandoc-citeproc
+- type: bib
+  path: current_library.bib
+- type: "pandoc-citeproc"
 ---
 
 ```{r setup, include=FALSE}
