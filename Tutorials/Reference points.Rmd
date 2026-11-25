@@ -85,7 +85,7 @@ legend("bottomright",c("Population 1","Population 2","Replacement"),bty="n",lwd=
 ```
 
 ## Sustainable Fisheries Framework: reference points
-The SFF and updates to the Fisheries Act ask that reference points be established for Canada's major fisheries. Reference points delinates zones of risk: from 'healthy' to 'cautious' and from 'cautious' to 'concern' (red). These two reference points are referred to as the **Upper Stock Reference Point** and the **Limit Reference Point**
+The SFF and updates to the Fisheries Act ask that reference points be established for Canada's major fisheries. Reference points delineates zones of risk: from 'healthy' to 'cautious' and from 'cautious' to 'concern' (red). These two reference points are referred to as the **Upper Stock Reference Point** and the **Limit Reference Point**.
 
 Based on these $\alpha$ and $\beta$ demographic parameters, we can use numerical methods to estimate various spawner, recruitment, or fisheries reference points. The most common ones are based on Maximum Sustainable Yield. Others might be based on fractions of *carrying capacity*: but this depends on whether we are interested in the *recruits at carrying capacity* $R_0$ or *spawners at carrying capacity* ($N_0$). In this version of the recruitment model, $\beta=R_{0}=N_{0}$ because, when adult mortality is $d_t=0$, then we are only modelling how current spawning adults create future spawning adults. Sometimes, we are modelling how current spawning adult abundances (or spawner biomass) create future juveniles (either in abundance or biomass) and $R_{0} \neq N_{0}$.
 
@@ -119,7 +119,7 @@ legend("bottomright",c("Beverton-Holt","Ricker","Replacement"),bty="n",lwd=1.5,l
 ```
 
 ### MSY
-Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population. It is a very helpful thing to know about the population, and it has a clear numerical solution as it occurs at the *maximum* of a yield curve. The *SFF* and Wild Salmon Policy (*WSP*) delineate healthy from not healthy fish populations using the *USR* - de facto DFO policies sets the *USR* to be $0.8S_{MSY}$ for reasons that aren't well established. The United States NOAA National Marine Fisheries Service, for instance, uses $S_{MSY}$. Where the missing 20% went, who knows but see @Frid2023 for our thoughts.
+Maximum Sustainable Yield *MSY* is the most fish (biomass or abundance) that can be removed from the population over the long-term given the productivity of the population (@Ricker1958). It is a very helpful thing to know about the population, and it has a clear numerical solution as it occurs at the *maximum* of a yield curve. The *SFF* and Wild Salmon Policy (*WSP*) delineate healthy from not healthy fish populations using the *USR* - de facto DFO policies sets the *USR* to be $0.8S_{MSY}$ for reasons that aren't well established. The United States NOAA National Marine Fisheries Service, for instance, uses $S_{MSY}$. Where the missing 20% went, who knows but see @Frid2023 for our thoughts.
 
 ```{r MSY, fig.cap="Yield curve indicating the amount of total catch (numbers or biomass) that can be expected given a certain amount of exploitation. The peak of this curve indicates the maximum sustainable yield that can be extracted from this population in perpetuity, given no changes in their demographics, etc."}
 umsy_find <- function(u_x,alpha, beta,model="Beverton-Holt")
@@ -149,7 +149,7 @@ MSY <- umsy*population_model(alpha=alpha,beta=beta,Nadults=S_msy,model="Beverton
 data.frame("U"=umsy,"Smsy"=S_msy,"MSY"=MSY)
 ```
 ### Limit reference point: S(gen)
-Then, we will estimate one version of a *Limit Reference Point* called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation based on its current productivity. It is a conservation-based benchmark and lets us know how depleted the population can get before we need to curtail harvest while still maintaining the ability to get back to MSY fairly quick.
+Then, we will estimate one version of a *Limit Reference Point* called S(gen). S(gen) is the spawner abundance that, in the absence of fishing, can reach S(MSY) within 1 generation based on its current productivity (@Holt2011). It is a conservation-based benchmark and lets us know how depleted the population can get before we need to curtail harvest while still maintaining the ability to get back to MSY fairly quick.
 
 ```{r Sgen}
 Sgen_find <- function(Smsy,Sgen,alpha,beta)
@@ -173,13 +173,13 @@ legend("bottomright",c("USR","LRP"),bty="n",lwd=1.5,lty=c(1,1),pch=c(NA,NA),col=
 
 ```
 
-So here we have our **SFF** and **Wild Salmon Policy** reference points for a population that reproduces according to Beverton-Holt dynamics. We used numerical methods (e.g., a univariate optimizer called `optimize`) to find these reference points. Sometimes, this is overkill as there is actually an analytical solution for some population dynamics models. For the Beverton-Holt, for instance, there is! Which just means you can use math to solve for MSY. Specifically, you can solve for the 2nd derivative of the population dynamics model, and then set the 2nd derivative equal to 0 to find where the production function is maximized (or where the rate of change in production is equal to 0).
+So here we have our **SFF** and **Wild Salmon Policy** reference points for a population that reproduces according to Beverton-Holt dynamics. We used numerical methods (e.g., a univariate optimizer called `optimize`) to find these reference points. Sometimes, this is overkill as there is actually an analytical solution for some population dynamics models. For the Beverton-Holt, for instance, there is (@Brooks2010)! Which just means you can use math to solve for MSY. Specifically, you can solve for the 2nd derivative of the population dynamics model, and then set the 2nd derivative equal to 0 to find where the production function is maximized (or where the rate of change in production is equal to 0).
 
 In this parameterization of the Beverton-Holt model (and there are several parameterizations that exist),
 
 $S_{MSY}=(\sqrt\alpha-1)/(\alpha-1)/\beta)$, which for our case is: `r (sqrt(alpha)-1)/((alpha-1)/beta)`
 
-But this doesn't work for all models. And, in our case, numerical solution for $S_{MSY}$ (`r S_msy`) gives a pretty close approximation to the analytical solution (`r (sqrt(alpha)-1)/((alpha-1)/beta)`) and works in many, many situations.
+But this doesn't work for all models. And, in our case, numerical solution for $S_{MSY}$ (`r S_msy`) gives a pretty close approximation to the analytical solution (`r (sqrt(alpha)-1)/((alpha-1)/beta)`) and works in many, many situations. There are also quick and dirty numerical approximations for the Ricker, for instance, (see @Brooks2010 and @Scheuerell2016) but they bake in their own assumptions and are limited to specific parameterizations of the population model. I prefer the numerical methods here, which are based on optimizing the yield curve - its fairly straightforward.
 
 # Part II: case study with simulation
 ## Recruitment stochasticity
@@ -321,6 +321,8 @@ legend("bottomright",c("Actual","Estimated"),bty="n",lwd=1.5,lty=c(1,2),pch=c(NA
 Not bad! Now, we have our reference points estimated (with uncertainty, but we don't calculate that here) from a `r Nyears` year time-series. And, we can assess this population in the future and determine status like: is it undergoing overfishing $U_{t}>U_{MSY}$ or it overfished $S_t<0.8S_{MSY}$. Or even, is it at a conservation concern $S_t<S_{GEN}$. Such is the power of the quantitative approach.
 
 If interested, we could revisit all of the above estimation assuming Ricker instead of Beverton-Holt dynamics. Or, assuming correlated versus independent recruitment deviates. Feel free to play around.
+
+The reference points above are mostly about assumptions of maximizing some utility from the fish population, which will be a very neoliberal objective for fisheries management (@Silver2022). But we could do other versions of reference points or benchmarks that are based on non-maximization (@Hilborn2010) or community values (@Frid2023).
 
 ## References
 <div id="refs"></div>

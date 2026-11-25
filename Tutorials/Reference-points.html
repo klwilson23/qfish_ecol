@@ -1681,11 +1681,11 @@ via compensatory density dependence.
 <div id="sustainable-fisheries-framework-reference-points" class="section level2">
 <h2>Sustainable Fisheries Framework: reference points</h2>
 <p>The SFF and updates to the Fisheries Act ask that reference points be
-established for Canada’s major fisheries. Reference points delinates
+established for Canada’s major fisheries. Reference points delineates
 zones of risk: from ‘healthy’ to ‘cautious’ and from ‘cautious’ to
 ‘concern’ (red). These two reference points are referred to as the
 <strong>Upper Stock Reference Point</strong> and the <strong>Limit
-Reference Point</strong></p>
+Reference Point</strong>.</p>
 <p>Based on these <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span> demographic parameters, we can use
 numerical methods to estimate various spawner, recruitment, or fisheries
 reference points. The most common ones are based on Maximum Sustainable
@@ -1744,11 +1744,12 @@ Comparison between Beverton-Holt and Ricker recruitment model.
 <h3>MSY</h3>
 <p>Maximum Sustainable Yield <em>MSY</em> is the most fish (biomass or
 abundance) that can be removed from the population over the long-term
-given the productivity of the population. It is a very helpful thing to
-know about the population, and it has a clear numerical solution as it
-occurs at the <em>maximum</em> of a yield curve. The <em>SFF</em> and
-Wild Salmon Policy (<em>WSP</em>) delineate healthy from not healthy
-fish populations using the <em>USR</em> - de facto DFO policies sets the
+given the productivity of the population (<span class="citation">Ricker
+(1958)</span>). It is a very helpful thing to know about the population,
+and it has a clear numerical solution as it occurs at the
+<em>maximum</em> of a yield curve. The <em>SFF</em> and Wild Salmon
+Policy (<em>WSP</em>) delineate healthy from not healthy fish
+populations using the <em>USR</em> - de facto DFO policies sets the
 <em>USR</em> to be <span class="math inline">\(0.8S_{MSY}\)</span> for
 reasons that aren’t well established. The United States NOAA National
 Marine Fisheries Service, for instance, uses <span class="math inline">\(S_{MSY}\)</span>. Where the missing 20% went, who
@@ -1799,10 +1800,10 @@ demographics, etc.
 <p>Then, we will estimate one version of a <em>Limit Reference
 Point</em> called S(gen). S(gen) is the spawner abundance that, in the
 absence of fishing, can reach S(MSY) within 1 generation based on its
-current productivity. It is a conservation-based benchmark and lets us
-know how depleted the population can get before we need to curtail
-harvest while still maintaining the ability to get back to MSY fairly
-quick.</p>
+current productivity (<span class="citation">Holt &amp; Bradford
+(2011)</span>). It is a conservation-based benchmark and lets us know
+how depleted the population can get before we need to curtail harvest
+while still maintaining the ability to get back to MSY fairly quick.</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>Sgen_find <span class="ot">&lt;-</span> <span class="cf">function</span>(Smsy,Sgen,alpha,beta)</span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>{</span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  (Smsy<span class="sc">-</span><span class="fu">population_model</span>(<span class="at">alpha=</span>alpha,<span class="at">beta=</span>beta,<span class="at">Nadults=</span>Sgen,<span class="at">model=</span><span class="st">&quot;Beverton-Holt&quot;</span>)<span class="sc">$</span>recruits)<span class="sc">^</span><span class="dv">2</span></span>
@@ -1837,11 +1838,12 @@ according to Beverton-Holt dynamics. We used numerical methods (e.g., a
 univariate optimizer called <code>optimize</code>) to find these
 reference points. Sometimes, this is overkill as there is actually an
 analytical solution for some population dynamics models. For the
-Beverton-Holt, for instance, there is! Which just means you can use math
-to solve for MSY. Specifically, you can solve for the 2nd derivative of
-the population dynamics model, and then set the 2nd derivative equal to
-0 to find where the production function is maximized (or where the rate
-of change in production is equal to 0).</p>
+Beverton-Holt, for instance, there is (<span class="citation">Brooks et
+al. (2010)</span>)! Which just means you can use math to solve for MSY.
+Specifically, you can solve for the 2nd derivative of the population
+dynamics model, and then set the 2nd derivative equal to 0 to find where
+the production function is maximized (or where the rate of change in
+production is equal to 0).</p>
 <p>In this parameterization of the Beverton-Holt model (and there are
 several parameterizations that exist),</p>
 <p><span class="math inline">\(S_{MSY}=(\sqrt\alpha-1)/(\alpha-1)/\beta)\)</span>,
@@ -1849,7 +1851,11 @@ which for our case is: 61.8034</p>
 <p>But this doesn’t work for all models. And, in our case, numerical
 solution for <span class="math inline">\(S_{MSY}\)</span> (61.80552)
 gives a pretty close approximation to the analytical solution (61.8034)
-and works in many, many situations.</p>
+and works in many, many situations. There are also quick and dirty
+numerical approximations for the Ricker, for instance, (see <span class="citation">Brooks et al. (2010)</span> and <span class="citation">Scheuerell (2016)</span>) but they bake in their own
+assumptions and are limited to specific parameterizations of the
+population model. I prefer the numerical methods here, which are based
+on optimizing the yield curve - its fairly straightforward.</p>
 </div>
 </div>
 </div>
@@ -2068,11 +2074,21 @@ quantitative approach.</p>
 <p>If interested, we could revisit all of the above estimation assuming
 Ricker instead of Beverton-Holt dynamics. Or, assuming correlated versus
 independent recruitment deviates. Feel free to play around.</p>
+<p>The reference points above are mostly about assumptions of maximizing
+some utility from the fish population, which will be a very neoliberal
+objective for fisheries management (<span class="citation">Silver et al.
+(2022)</span>). But we could do other versions of reference points or
+benchmarks that are based on non-maximization (<span class="citation">Hilborn (2010)</span>) or community values (<span class="citation">Frid et al. (2023)</span>).</p>
 </div>
 </div>
 <div id="references" class="section level2">
 <h2>References</h2>
 <div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0" line-spacing="2">
+<div id="ref-Brooks2010" class="csl-entry">
+Brooks, E.N., Powers, J.E. &amp; Cortés, E. (2010). <a href="https://doi.org/10.1093/icesjms/fsp225"><span class="nocase">Analytical reference points for age-structured models:
+Application to data-poor fisheries</span></a>. <em>ICES Journal of
+Marine Science</em>, 67, 165–175.
+</div>
 <div id="ref-Forrest2010" class="csl-entry">
 Forrest, R.E., McAllister, M.K., Dorn, M.W., Martell, S.J.D. &amp;
 Stanley, R.D. (2010). <a href="https://doi.org/10.1139/f10-077"><span class="nocase">Hierarchical Bayesian estimation of recruitment
@@ -2087,11 +2103,39 @@ Frid, A., Wilson, K.L., Walkus, J., Forrest, R.E. &amp; Reid, M. (2023).
 collaborative fisheries management inclusive of Indigenous Knowledge
 Systems</span></a>. <em>Fish and Fisheries</em>, 24, 940–958.
 </div>
+<div id="ref-Hilborn2010" class="csl-entry">
+Hilborn, R. (2010). <a href="https://doi.org/10.1016/j.marpol.2009.04.013"><span class="nocase">Pretty Good Yield and exploited fishes</span></a>.
+<em>Marine Policy</em>, 34, 193–196.
+</div>
+<div id="ref-Holt2011" class="csl-entry">
+Holt, C.A. &amp; Bradford, M.J. (2011). <a href="https://doi.org/10.1080/02755947.2011.578525"><span class="nocase">Evaluating Benchmarks of Population Status for Pacific
+Salmon</span></a>. <em>North American Journal of Fisheries
+Management</em>, 31, 363–378.
+</div>
 <div id="ref-methot_adjusting_2011" class="csl-entry">
 Methot, R.D. &amp; Taylor, I.G. (2011). <a href="https://doi.org/10.1139/f2011-092"><span class="nocase">Adjusting
 for bias due to variability of estimated recruitments in fishery
 assessment models</span></a>. <em>Canadian Journal of Fisheries and
 Aquatic Sciences</em>, 68, 1744–1760.
+</div>
+<div id="ref-Ricker1958" class="csl-entry">
+Ricker, W.E. (1958). <a href="https://doi.org/10.1139/f58-054"><span class="nocase">Maximum Sustained Yields from Fluctuating Environments
+and Mixed Stocks</span></a>. <em>Journal of the Fisheries Research Board
+of Canada</em>, 15, 991–1006.
+</div>
+<div id="ref-Scheuerell2016" class="csl-entry">
+Scheuerell, M.D. (2016). <a href="https://doi.org/10.7717/peerj.1623"><span class="nocase">An
+explicit solution for calculating optimum spawning stock size from
+Ricker’s stock recruitment model</span></a>. <em>PeerJ</em>, 2016,
+e1623.
+</div>
+<div id="ref-Silver2022" class="csl-entry">
+Silver, J.J., Okamoto, D.K., Armitage, D., Alexander, S.M., Atleo,
+C.(Kam’ayaam/Chachim’multhnii)., Burt, J.M., Jones, R.(Nang.J., Lee,
+L.C., Muhl, E.-K.K., Salomon, A.K. &amp; Stoll, J.S. (2022). <a href="https://doi.org/10.1086/720152"><span class="nocase">Fish, people,
+and systems of power: understanding and disrupting feedback between
+colonialism and fisheries science</span></a>. <em>American
+Naturalist</em>, 200, 168–180.
 </div>
 <div id="ref-Walters2004" class="csl-entry">
 Walters, C.J. &amp; Martell, S.J.D. (2004). <em><span class="nocase">Fisheries ecology and management</span></em>. Princeton
